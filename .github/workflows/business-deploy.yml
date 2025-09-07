@@ -5,8 +5,8 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'services/business/**'      
-      - 'config/**'
+      - 'services/business/**'  # business 서비스 관련 변경 감지
+      - 'config/**'             # 환경파일 변경 감지 가능
 
 jobs:
   deploy:
@@ -27,33 +27,35 @@ jobs:
       - name: Deploy business service
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SERVER_IP }} '
-          PROJECT_DIR="/opt/Pilot_Project"
-          SERVICE_DIR="$PROJECT_DIR/services/business"
-          CONFIG_DIR="$PROJECT_DIR/config"
+            PROJECT_DIR="/opt/Pilot_Project"
+            SERVICE_DIR="$PROJECT_DIR/services/business"
+            CONFIG_DIR="$PROJECT_DIR/config"
 
-          # 필요한 디렉토리 생성 및 권한 설정
-          sudo mkdir -p $SERVICE_DIR/compose
-          sudo mkdir -p $CONFIG_DIR
-          sudo chown -R ubuntu:ubuntu $PROJECT_DIR
+            # 1️⃣ 디렉토리 생성 및 권한 설정
+            sudo mkdir -p $SERVICE_DIR/compose
+            sudo mkdir -p $CONFIG_DIR
+            sudo chown -R ubuntu:ubuntu $PROJECT_DIR
 
-          # 서버에서 소스코드 최신화
-          cd $PROJECT_DIR
-          if [ ! -d ".git" ]; then
-              git init
-              git remote add pilot ${{ secrets.PILOT_REPO_URL }}
-          fi
-          git fetch pilot main
-          git reset --hard pilot/main
+            # 2️⃣ Git 초기화 및 최신화
+            cd $PROJECT_DIR
+            if [ ! -d ".git" ]; then
+                git init
+                git remote add pilot ${{ secrets.PILOT_REPO_URL }}
+            fi
+            git fetch pilot main
+            git reset --hard pilot/main
 
-          # prod 환경파일 생성
-          echo "${{ secrets.BUSINESS_MAIN_ENV }}" | sudo tee $CONFIG_DIR/main.env > /dev/null
+            # 3️⃣ 환경파일 생성
+            echo "${{ secrets.BUSINESS_MAIN_ENV }}" | sudo tee $CONFIG_DIR/main.env > /dev/null
 
-          # 컨테이너 종료 및 새 컨테이너 빌드/실행
-          cd $SERVICE_DIR/compose
-          sudo docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
-          sudo docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+            # 4️⃣ 기존 컨테이너 종료 (존재하는 경우만)
+            if [ "$(sudo docker ps -q -f name=business)" ]; then
+                sudo docker-compose -f $SERVICE_DIR/compose/docker-compose.yml -f $SERVICE_DIR/compose/docker-compose.prod.yml down
+            fi
 
-          # Nginx 재시작
-          sudo nginx -t
-          sudo systemctl restart nginx
+            # 5️⃣ 새 컨테이너 빌드 및 실행
+            sudo docker-compose -f $SERVICE_DIR/compose/docker-compose.yml -f $SERVICE_DIR/compose/docker-compose.prod.yml up -d --build
+
+            # 6️⃣ Nginx 재시작
+            sudo systemctl reload nginx
           '
