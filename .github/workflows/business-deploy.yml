@@ -26,6 +26,10 @@ jobs:
       - name: Deploy business service
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SERVER_IP }} '
+          # 필요한 디렉토리 생성 (없으면 생성)
+          mkdir -p /opt/Pilot_Project/services/business/compose
+          mkdir -p /opt/Pilot_Project/config
+
           # 작업 디렉토리 이동
           cd /opt/Pilot_Project/services/business/compose
 
