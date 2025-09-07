@@ -45,11 +45,12 @@ jobs:
             # 3️⃣ 환경파일 생성
             echo "${{ secrets.BUSINESS_MAIN_ENV }}" | sudo tee $CONFIG_DIR/main.env > /dev/null
 
-            # 4️⃣ 기존 컨테이너 종료
+            # 4️⃣ 기존 컨테이너 종료 및 제거
             sudo docker-compose -f $SERVICE_DIR/compose/docker-compose.prod.yml down || true
 
-            # 5️⃣ 새 컨테이너 빌드 및 실행
-            sudo docker-compose -f $SERVICE_DIR/compose/docker-compose.prod.yml up -d --build
+            # 5️⃣ 새 이미지 빌드 (캐시 무효화) 및 컨테이너 실행
+            sudo docker-compose -f $SERVICE_DIR/compose/docker-compose.prod.yml build --no-cache
+            sudo docker-compose -f $SERVICE_DIR/compose/docker-compose.prod.yml up -d
 
             # 6️⃣ Nginx 재시작
             sudo systemctl reload nginx
