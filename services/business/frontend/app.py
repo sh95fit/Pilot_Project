@@ -1,6 +1,7 @@
 # services/business/frontend/app.py
 import streamlit as st
 import requests
+import os
 
 st.title("Business Dashboard")
 
