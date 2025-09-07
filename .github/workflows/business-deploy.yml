@@ -43,7 +43,7 @@ jobs:
             git reset --hard pilot/main
 
             # 3️⃣ 환경파일 생성
-            echo "${{ secrets.BUSINESS_MAIN_ENV }}" | sudo tee $SERVICE_DIR/config/main.env > /dev/null
+            echo "${{ secrets.BUSINESS_MAIN_ENV }}" | sudo tee $CONFIG_DIR/main.env > /dev/null
 
             # 4️⃣ 기존 컨테이너 종료
             sudo docker-compose -f $SERVICE_DIR/compose/docker-compose.prod.yml down || true
