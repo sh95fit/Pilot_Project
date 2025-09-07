@@ -3,12 +3,11 @@ version: "3.9"
 services:
   backend:
     build:
-      context: /opt/Pilot_Project                 # 컨텍스트를 프로젝트 루트로 설정
-      dockerfile: services/business/backend/Dockerfile
+      context: ../backend
       args:
         ENVIRONMENT: prod
     container_name: business_backend
-    env_file: config/main.env                     # compose 위치 기준 상대 경로
+    env_file: ../../../config/main.env   # compose 위치 기준 상대 경로
     command: uvicorn main:app --host 0.0.0.0 --port 8000
     restart: always
     ports:
@@ -16,12 +15,11 @@ services:
 
   frontend:
     build:
-      context: /opt/Pilot_Project
-      dockerfile: services/business/frontend/Dockerfile
-      args:
+      context: ../frontend
+      args:s
         ENVIRONMENT: prod
     container_name: business_frontend
-    env_file: config/main.env
+    env_file: ../../../config/main.env   # compose 위치 기준 상대 경로
     command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
     restart: always
     ports:
