@@ -15,7 +15,7 @@ numpy = "^2.3.2"
 pyplotlib = "^0.0.56"
 requests = "^2.32.5"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"
 
 [build-system]
