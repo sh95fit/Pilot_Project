@@ -26,19 +26,20 @@ jobs:
       - name: Deploy business service
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SERVER_IP }} '
-          # 필요한 디렉토리 생성 (없으면 생성)
-          mkdir -p /opt/Pilot_Project/services/business/compose
-          mkdir -p /opt/Pilot_Project/config
+          # 필요한 디렉토리 생성 (없으면 생성) 및 권한 설정
+          sudo mkdir -p /opt/Pilot_Project/services/business/compose
+          sudo mkdir -p /opt/Pilot_Project/config
+          sudo chown -R ubuntu:ubuntu /opt/Pilot_Project
 
           # 작업 디렉토리 이동
           cd /opt/Pilot_Project/services/business/compose
 
           # GitHub Secrets로 prod 환경변수 파일 생성
-          echo "${{ secrets.BUSINESS_MAIN_ENV }}" > ../../config/main.env
+          echo "${{ secrets.BUSINESS_MAIN_ENV }}" | sudo tee ../../config/main.env > /dev/null
 
           # 기존 컨테이너 종료
-          docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
+          sudo docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
 
           # 새 컨테이너 빌드 및 실행
-          docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+          sudo docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
           '
