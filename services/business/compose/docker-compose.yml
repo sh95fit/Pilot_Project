@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ../backend
+      args:
+        ENVIRONMENT: dev
+    container_name: business_backend
+    env_file: ../../config/dev.env
+    ports:
+      - "8000:8000"
+    restart: always
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        ENVIRONMENT: dev
+    container_name: business_frontend
+    env_file: ../../config/dev.env
+    ports:
+      - "8501:8501"
+    restart: always
