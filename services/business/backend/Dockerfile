@@ -1,4 +1,3 @@
-# services/business/frontend/Dockerfile
 FROM python:3.11-slim
 
 ARG ENVIRONMENT=dev
@@ -8,7 +7,9 @@ RUN pip install --no-cache-dir poetry
 
 WORKDIR /app
 
+# 컨텍스트 내부 pyproject.toml, poetry.lock 복사
 COPY pyproject.toml poetry.lock* ./
+
 RUN poetry config virtualenvs.create false && \
     if [ "$ENVIRONMENT" = "prod" ]; then \
         poetry install --no-dev --no-root; \
@@ -16,8 +17,13 @@ RUN poetry config virtualenvs.create false && \
         poetry install --no-root; \
     fi
 
-COPY ./services/business/frontend ./
+# 컨텍스트 내부 모든 소스 복사
+COPY . .
 
-EXPOSE 8501
+EXPOSE 8000
 
-CMD streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+CMD if [ "$ENVIRONMENT" = "prod" ]; then \
+        uvicorn main:app --host 0.0.0.0 --port 8000; \
+    else \
+        uvicorn main:app --reload --host 0.0.0.0 --port 8000; \
+    fi
