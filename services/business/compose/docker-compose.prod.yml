@@ -3,11 +3,12 @@ version: "3.9"
 services:
   backend:
     build:
-      context: ../backend
+      context: ../../../
+      dockerfile: services/business/backend/Dockerfile
       args:
         ENVIRONMENT: prod
     container_name: business_backend
-    env_file: ../../../config/main.env   # compose 위치 기준 상대 경로
+    env_file: config/main.env   # compose 위치 기준 상대 경로
     command: uvicorn main:app --host 0.0.0.0 --port 8000
     restart: always
     ports:
@@ -15,11 +16,12 @@ services:
 
   frontend:
     build:
-      context: ../frontend
+      context: ../../../
+      dockerfile: services/business/frontend/Dockerfile
       args:
         ENVIRONMENT: prod
     container_name: business_frontend
-    env_file: ../../../config/main.env   # compose 위치 기준 상대 경로
+    env_file: config/main.env   # compose 위치 기준 상대 경로
     command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
     restart: always
     ports:

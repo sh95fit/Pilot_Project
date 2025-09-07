@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir poetry
 
 WORKDIR /app
 
-COPY ../../../pyproject.toml ../../../poetry.lock* ./
+COPY pyproject.toml poetry.lock* ./
 
 RUN poetry config virtualenvs.create false && \
     if [ "$ENVIRONMENT" = "prod" ]; then \
@@ -16,7 +16,7 @@ RUN poetry config virtualenvs.create false && \
         poetry install --no-root; \
     fi
 
-COPY . .
+COPY services/business/frontend/. ./
 
 EXPOSE 8501
 
