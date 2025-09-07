@@ -14,7 +14,7 @@ else:
     backend_url = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 try:
-    resp = requests.get(f"{backend_url}/api/health")
+    resp = requests.get(f"{backend_url}/health")
     status = resp.json().get("status", "unknown")
     st.write(f"Backend Health: {status}")
 except Exception as e:
