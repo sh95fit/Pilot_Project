@@ -17,7 +17,7 @@ RUN poetry config virtualenvs.create false && \
         poetry install --no-root; \
     fi
 
-COPY services/business/backend ./
+COPY services/business/backend/. ./
 
 EXPOSE 8000
 
