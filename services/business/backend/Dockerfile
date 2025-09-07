@@ -12,7 +12,7 @@ COPY pyproject.toml poetry.lock* ./
 
 RUN poetry config virtualenvs.create false && \
     if [ "$ENVIRONMENT" = "prod" ]; then \
-        poetry install --no-dev --no-root; \
+        poetry install --without dev --no-root; \
     else \
         poetry install --no-root; \
     fi
