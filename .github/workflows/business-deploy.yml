@@ -18,7 +18,7 @@ jobs:
 
       # 2️⃣ SSH 설정 (OCI 서버 접속용)
       - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.8.1
+        uses: webfactory/ssh-agent@v0.8.2
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
