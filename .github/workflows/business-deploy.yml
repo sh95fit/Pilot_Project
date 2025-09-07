@@ -1,11 +1,12 @@
+# .github/workflows/business-deploy.yml
 name: Business Service Deploy
 
 on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'services/business/**'      # business 서비스 관련 변경만 감지
-      - 'config/**'                 # 환경파일 변경 감지 가능
+      - 'services/business/**'      
+      - 'config/**'
 
 jobs:
   deploy:
@@ -26,20 +27,33 @@ jobs:
       - name: Deploy business service
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SERVER_IP }} '
-          # 필요한 디렉토리 생성 (없으면 생성) 및 권한 설정
-          sudo mkdir -p /opt/Pilot_Project/services/business/compose
-          sudo mkdir -p /opt/Pilot_Project/config
-          sudo chown -R ubuntu:ubuntu /opt/Pilot_Project
+          PROJECT_DIR="/opt/Pilot_Project"
+          SERVICE_DIR="$PROJECT_DIR/services/business"
+          CONFIG_DIR="$PROJECT_DIR/config"
 
-          # 작업 디렉토리 이동
-          cd /opt/Pilot_Project/services/business/compose
+          # 필요한 디렉토리 생성 및 권한 설정
+          sudo mkdir -p $SERVICE_DIR/compose
+          sudo mkdir -p $CONFIG_DIR
+          sudo chown -R ubuntu:ubuntu $PROJECT_DIR
 
-          # GitHub Secrets로 prod 환경변수 파일 생성
-          echo "${{ secrets.BUSINESS_MAIN_ENV }}" | sudo tee ../../config/main.env > /dev/null
+          # 서버에서 소스코드 최신화
+          cd $PROJECT_DIR
+          if [ ! -d ".git" ]; then
+              git init
+              git remote add pilot ${{ secrets.PILOT_REPO_URL }}
+          fi
+          git fetch pilot main
+          git reset --hard pilot/main
 
-          # 기존 컨테이너 종료
+          # prod 환경파일 생성
+          echo "${{ secrets.BUSINESS_MAIN_ENV }}" | sudo tee $CONFIG_DIR/main.env > /dev/null
+
+          # 컨테이너 종료 및 새 컨테이너 빌드/실행
+          cd $SERVICE_DIR/compose
           sudo docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
-
-          # 새 컨테이너 빌드 및 실행
           sudo docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+          # Nginx 재시작
+          sudo nginx -t
+          sudo systemctl restart nginx
           '
