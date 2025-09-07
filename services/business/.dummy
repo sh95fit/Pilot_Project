@@ -16,3 +16,4 @@ config 경로 일치화
 컨텍스트 재조정
 Config 경로 조정
 poetry 명령어 옵션 변경
+uvicorn 추가 설치
