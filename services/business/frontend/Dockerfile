@@ -1,4 +1,3 @@
-# services/business/frontend/Dockerfile
 FROM python:3.11-slim
 
 ARG ENVIRONMENT=dev
@@ -9,6 +8,7 @@ RUN pip install --no-cache-dir poetry
 WORKDIR /app
 
 COPY pyproject.toml poetry.lock* ./
+
 RUN poetry config virtualenvs.create false && \
     if [ "$ENVIRONMENT" = "prod" ]; then \
         poetry install --no-dev --no-root; \
@@ -16,7 +16,7 @@ RUN poetry config virtualenvs.create false && \
         poetry install --no-root; \
     fi
 
-COPY ./services/business/frontend ./
+COPY . .
 
 EXPOSE 8501
 

@@ -1,4 +1,4 @@
-# services/business/backend/Dockerfile
+# services/business/frontend/Dockerfile
 FROM python:3.11-slim
 
 ARG ENVIRONMENT=dev
@@ -16,12 +16,8 @@ RUN poetry config virtualenvs.create false && \
         poetry install --no-root; \
     fi
 
-COPY ./services/business/backend ./
+COPY ./services/business/frontend ./
 
-EXPOSE 8000
+EXPOSE 8501
 
-CMD if [ "$ENVIRONMENT" = "prod" ]; then \
-        uvicorn main:app --host 0.0.0.0 --port 8000; \
-    else \
-        uvicorn main:app --reload --host 0.0.0.0 --port 8000; \
-    fi
+CMD streamlit run app.py --server.port 8501 --server.address 0.0.0.0
