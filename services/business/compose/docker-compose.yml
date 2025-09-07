@@ -3,7 +3,8 @@ version: "3.9"
 services:
   backend:
     build:
-      context: ../backend
+      context: ../../../
+      dockerfile: services/business/backend/Dockerfile
       args:
         ENVIRONMENT: dev
     container_name: business_backend
@@ -13,7 +14,8 @@ services:
 
   frontend:
     build:
-      context: ../frontend
+      context: ../../../
+      dockerfile: services/business/frontend/Dockerfile
       args:
         ENVIRONMENT: dev
     container_name: business_frontend

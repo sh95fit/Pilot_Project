@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir poetry
 WORKDIR /app
 
 # 컨텍스트 내부 pyproject.toml, poetry.lock 복사
-COPY ../../../pyproject.toml ../../../poetry.lock* ./
+COPY pyproject.toml poetry.lock* ./
 
 RUN poetry config virtualenvs.create false && \
     if [ "$ENVIRONMENT" = "prod" ]; then \
@@ -17,8 +17,7 @@ RUN poetry config virtualenvs.create false && \
         poetry install --no-root; \
     fi
 
-# 컨텍스트 내부 모든 소스 복사
-COPY . .
+COPY services/business/backend ./
 
 EXPOSE 8000
 
