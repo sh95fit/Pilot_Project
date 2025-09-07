@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "pilot-project"
+version = "0.1.0"
+description = "Monorepo for marketing service"
+authors = ["h95fit <h95fit@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.11"
+fastapi = "^0.116.1"
+sqlalchemy = "^2.0.43"
+pymysql = "^1.1.2"
+streamlit = "^1.49.1"
+pandas = "^2.3.2"
+numpy = "^2.3.2"
+pyplotlib = "^0.0.56"
+requests = "^2.32.5"
+
+[tool.poetry.dev-dependencies]
+pytest = "^8.4.2"
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
