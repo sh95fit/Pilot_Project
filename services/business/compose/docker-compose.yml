@@ -1,24 +1,41 @@
+# services/business/compose/docker-compose.yml
 version: "3.9"
 
 services:
   backend:
     build:
-      context: ../../../
+      context: ../../../          # 루트 디렉토리를 context로 설정
       dockerfile: services/business/backend/Dockerfile
-      args:
-        ENVIRONMENT: dev
+      target: ${BUILD_TARGET:-dev}
     container_name: business_backend
-    ports:
-      - "8000:8000"
-    restart: always
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-dev}
+    restart: unless-stopped
+    networks:
+      - business_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
     build:
-      context: ../../../
+      context: ../../../          # 루트 디렉토리를 context로 설정
       dockerfile: services/business/frontend/Dockerfile
-      args:
-        ENVIRONMENT: dev
+      target: ${BUILD_TARGET:-dev}
     container_name: business_frontend
-    ports:
-      - "8501:8501"
-    restart: always
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-dev}
+      - BACKEND_URL=http://backend:8000
+    restart: unless-stopped
+    networks:
+      - business_network
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  business_network:
+    driver: bridge

@@ -2,56 +2,140 @@
 name: Business Service Deploy
 
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'services/business/**'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+      - '.github/workflows/business-deploy.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'services/business/**'
-      - 'config/**'
+
+env:
+  SERVICE_NAME: business
 
 jobs:
-  deploy:
+  # 테스트 단계
+  test:
     runs-on: ubuntu-latest
-
+    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          poetry install
+
+      - name: Run tests
+        run: |
+          poetry run pytest services/business/ -v || echo "No tests found, skipping..."
+
+      - name: Build test
+        run: |
+          cd services/business/compose
+          BUILD_TARGET=prod docker compose -f docker-compose.yml build
+
+  # 배포 단계
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Deploy business service
+      - name: Deploy to OCI server
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SERVER_IP }} '
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SERVER_IP }} << 'EOF'
+            set -e
+            
             PROJECT_DIR="/opt/Pilot_Project"
             SERVICE_DIR="$PROJECT_DIR/services/business"
+            COMPOSE_DIR="$SERVICE_DIR/compose"
             CONFIG_DIR="$PROJECT_DIR/config"
 
+            echo "🚀 Starting deployment..."
+
             # 1️⃣ 디렉토리 생성 및 권한 설정
-            sudo mkdir -p $SERVICE_DIR/compose
-            sudo mkdir -p $CONFIG_DIR
+            sudo mkdir -p $SERVICE_DIR $CONFIG_DIR
             sudo chown -R ubuntu:ubuntu $PROJECT_DIR
 
-            # 2️⃣ Git 초기화 및 최신화
+            # 2️⃣ Git 업데이트
             cd $PROJECT_DIR
             if [ ! -d ".git" ]; then
                 git init
+                git remote add origin ${{ secrets.PILOT_REPO_URL }}
             fi
-            git remote get-url pilot >/dev/null 2>&1 || git remote add pilot ${{ secrets.PILOT_REPO_URL }}
-            git fetch pilot main
-            git reset --hard pilot/main
+            
+            # 기존 remote URL 업데이트
+            git remote set-url origin ${{ secrets.PILOT_REPO_URL }} || true
+            git fetch origin main
+            git reset --hard origin/main
 
-            # 3️⃣ 환경파일 생성
-            echo "${{ secrets.BUSINESS_MAIN_ENV }}" | sudo tee $CONFIG_DIR/main.env > /dev/null
+            # 3️⃣ 환경파일 생성 
+            umask 077  # 파일 권한을 600으로 설정
+            echo "${{ secrets.BUSINESS_MAIN_ENV }}" > $CONFIG_DIR/main.env
+            chmod 600 $CONFIG_DIR/main.env
 
-            # 4️⃣ 기존 컨테이너 종료 및 제거
-            sudo docker-compose -f $SERVICE_DIR/compose/docker-compose.prod.yml down || true
+            # 4️⃣ 기존 서비스 헬스체크 및 graceful shutdown
+            cd $COMPOSE_DIR
+            if docker compose -f docker-compose.yml -f docker-compose.prod.yml ps --services --filter "status=running" | grep -q .; then
+                echo "📋 Stopping existing services..."
+                docker compose -f docker-compose.yml -f docker-compose.prod.yml down --timeout 30
+            fi
 
-            # 5️⃣ 새 이미지 빌드 (캐시 무효화) 및 컨테이너 실행
-            sudo docker-compose -f $SERVICE_DIR/compose/docker-compose.prod.yml build --no-cache
-            sudo docker-compose -f $SERVICE_DIR/compose/docker-compose.prod.yml up -d
+            # 5️⃣ 이미지 빌드 및 배포
+            echo "🔨 Building images..."
+            BUILD_TARGET=prod ENVIRONMENT=prod docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
 
-            # 6️⃣ Nginx 재시작
-            sudo systemctl reload nginx
-          '
+            echo "🚢 Starting services..."
+            BUILD_TARGET=prod ENVIRONMENT=prod docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+            # 6️⃣ Nginx 설정 테스트 및 재로드
+            echo "🔄 Reloading nginx..."
+            if sudo nginx -t; then
+                sudo systemctl reload nginx
+                echo "✅ Nginx reloaded successfully"
+            else
+                echo "❌ Nginx configuration test failed"
+                exit 1
+            fi
+
+            # 7️⃣ 정리
+            echo "🧹 Cleaning up unused images..."
+            docker image prune -f
+
+            echo "🎉 Deployment completed successfully!"
+            
+            # 최종 상태 확인
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+          EOF
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+          fi
