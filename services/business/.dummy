@@ -20,3 +20,4 @@ uvicorn 추가 설치
 워크플로우 개선
 프론트엔드 코드 수정
 poetry 명령어 수정
+workflow 변수 조정
