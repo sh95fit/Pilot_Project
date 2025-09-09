@@ -10,8 +10,6 @@ services:
     container_name: business_backend
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-dev}
-    env_file:
-      - ../../../config/dev.env
     restart: unless-stopped
     networks:
       - business_network
@@ -34,8 +32,6 @@ services:
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-dev}
       - BACKEND_URL=http://backend:8000
-    env_file:
-      - ../../../config/dev.env
     restart: unless-stopped
     networks:
       - business_network
