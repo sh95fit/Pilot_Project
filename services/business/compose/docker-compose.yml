@@ -15,7 +15,6 @@ services:
       - business_network
     volumes:
       - ../../../config:/app/config:ro
-      - ssh_keys:/app/keys:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -42,11 +41,3 @@ services:
 networks:
   business_network:
     driver: bridge
-
-volumes:
-  ssh_keys:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${SSH_KEY_PATH:-./keys}

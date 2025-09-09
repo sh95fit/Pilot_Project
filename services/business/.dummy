@@ -23,4 +23,4 @@ poetry 명령어 수정
 workflow 변수 조정
 dev.env 도커컴포즈 위치 조정
 sudo 권한 적용
-keys 경로 포함
+키 관련 볼륨 마운트 삭제
