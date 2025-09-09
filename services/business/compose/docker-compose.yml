@@ -15,8 +15,6 @@ services:
       - business_network
     volumes:
       - ../../../config:/app/config:ro
-    ports:
-      - "8000:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -34,8 +32,6 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-dev}
       - BACKEND_URL=http://backend:8000
     restart: unless-stopped
-    ports:
-      - "8501:8501"
     networks:
       - business_network
     depends_on:

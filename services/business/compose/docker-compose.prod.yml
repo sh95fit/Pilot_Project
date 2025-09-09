@@ -5,7 +5,9 @@ services:
       - DEBUG=false
       - LOG_LEVEL=INFO
     env_file:
-      - ../../../config/main.env   
+      - ../../../config/main.env  
+    ports:
+      - "8000:8000" 
     # 리소스 제한
     deploy:
       resources:
@@ -28,6 +30,8 @@ services:
       - LOG_LEVEL=INFO
     env_file:
       - ../../../config/main.env   
+    ports:
+      - "8501:8501"
     deploy:
       resources:
         limits:
