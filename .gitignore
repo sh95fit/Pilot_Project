@@ -7,7 +7,6 @@ __pycache__/
 *.pem
 *.key
 *.ppk
-keys
 
 # Poetry
 .poetry/
