@@ -33,8 +33,8 @@ RUN poetry config virtualenvs.create false && \
     poetry install --no-root && rm -rf $POETRY_CACHE_DIR
 
 # 소스 코드 복사
-COPY ./shared ./shared
-COPY ./services/business/backend ./
+COPY ./shared/. ./shared
+COPY ./services/business/backend/. ./
 
 # 비특권 사용자 생성 및 권한 설정
 RUN adduser --disabled-password --gecos '' appuser && \
@@ -53,8 +53,8 @@ RUN poetry config virtualenvs.create false && \
     poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
 
 # 소스 코드 복사
-COPY ./shared ./shared
-COPY ./services/business/backend ./
+COPY ./shared/. ./shared
+COPY ./services/business/backend/. ./
 
 
 RUN adduser --disabled-password --gecos '' appuser && \

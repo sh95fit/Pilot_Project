@@ -25,3 +25,4 @@ dev.env 도커컴포즈 위치 조정
 sudo 권한 적용
 키 관련 볼륨 마운트 삭제
 health check 이슈 조치
+포트 연결
