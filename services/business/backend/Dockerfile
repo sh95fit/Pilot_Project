@@ -34,7 +34,7 @@ RUN poetry config virtualenvs.create false && \
 
 # 소스 코드 복사
 COPY ./shared/. ./shared
-COPY ./services/business/backend/. ./
+COPY ./services/business/backend/. ./backend
 
 # 비특권 사용자 생성 및 권한 설정
 RUN adduser --disabled-password --gecos '' appuser && \
@@ -42,7 +42,7 @@ RUN adduser --disabled-password --gecos '' appuser && \
 USER appuser
 
 EXPOSE 8000
-CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["poetry", "run", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # =========================
 # 프로덕션 단계
@@ -54,7 +54,7 @@ RUN poetry config virtualenvs.create false && \
 
 # 소스 코드 복사
 COPY ./shared/. ./shared
-COPY ./services/business/backend/. ./
+COPY ./services/business/backend/. ./backend
 
 
 RUN adduser --disabled-password --gecos '' appuser && \
@@ -62,4 +62,4 @@ RUN adduser --disabled-password --gecos '' appuser && \
 USER appuser
 
 EXPOSE 8000
-CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["poetry", "run", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
