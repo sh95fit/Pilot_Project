@@ -84,13 +84,13 @@ jobs:
             cd $PROJECT_DIR
             if [ ! -d ".git" ]; then
                 git init
-                git remote add origin ${{ secrets.PILOT_REPO_URL }}
+                git remote add pilot ${{ secrets.PILOT_REPO_URL }}
             fi
             
             # 기존 remote URL 업데이트
-            git remote set-url origin ${{ secrets.PILOT_REPO_URL }} || true
-            git fetch origin main
-            git reset --hard origin/main
+            git remote set-url pilot ${{ secrets.PILOT_REPO_URL }} || true
+            git fetch pilot main
+            git reset --hard pilot/main
 
             # 3️⃣ 환경파일 생성 
             umask 077  # 파일 권한을 600으로 설정
