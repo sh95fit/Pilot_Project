@@ -30,7 +30,7 @@ RUN poetry config virtualenvs.create false && \
 
 # 소스 코드 복사
 COPY ./shared/. ./shared
-COPY ./services/business/backend/. ./
+COPY ./services/business/frontend/. ./frontend
 
 
 # 비특권 사용자 생성 및 권한 설정
@@ -39,7 +39,7 @@ RUN adduser --disabled-password --gecos '' appuser && \
 USER appuser
 
 EXPOSE 8501
-CMD ["poetry", "run", "streamlit", "run", "app/main.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
+CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
 
 # =========================
 # 프로덕션 단계
@@ -51,11 +51,11 @@ RUN poetry config virtualenvs.create false && \
 
 # 소스 코드 복사
 COPY ./shared/. ./shared
-COPY ./services/business/backend/. ./
+COPY ./services/business/frontend/. ./frontend
 
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8501
-CMD ["poetry", "run", "streamlit", "run", "app/main.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
+CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
