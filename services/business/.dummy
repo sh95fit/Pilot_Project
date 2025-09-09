@@ -22,3 +22,4 @@ uvicorn 추가 설치
 poetry 명령어 수정
 workflow 변수 조정
 dev.env 도커컴포즈 위치 조정
+sudo 권한 적용용
