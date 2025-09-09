@@ -32,6 +32,7 @@ RUN poetry config virtualenvs.create false && \
 COPY ./shared ./shared
 COPY ./services/business/frontend ./
 
+
 # 비특권 사용자 생성 및 권한 설정
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
