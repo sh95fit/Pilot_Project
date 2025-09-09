@@ -35,7 +35,7 @@ services:
       - BACKEND_URL=http://backend:8000
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8501:8501"
     networks:
       - business_network
     depends_on:
