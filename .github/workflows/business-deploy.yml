@@ -101,17 +101,17 @@ jobs:
 
             # 4️⃣ 기존 서비스 헬스체크 및 graceful shutdown
             cd $COMPOSE_DIR
-            if docker compose -f docker-compose.yml -f docker-compose.prod.yml ps --services --filter "status=running" | grep -q .; then
+            if sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml ps --services --filter "status=running" | grep -q .; then
                 echo "📋 Stopping existing services..."
-                docker compose -f docker-compose.yml -f docker-compose.prod.yml down --timeout 30
+                sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml down --timeout 30
             fi
 
             # 5️⃣ 이미지 빌드 및 배포
             echo "🔨 Building images..."
-            BUILD_TARGET=prod ENVIRONMENT=prod docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
+            BUILD_TARGET=prod ENVIRONMENT=prod sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
 
             echo "🚢 Starting services..."
-            BUILD_TARGET=prod ENVIRONMENT=prod docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            BUILD_TARGET=prod ENVIRONMENT=prod sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
             # 6️⃣ Nginx 설정 테스트 및 재로드
             echo "🔄 Reloading nginx..."
@@ -125,12 +125,12 @@ jobs:
 
             # 7️⃣ 정리
             echo "🧹 Cleaning up unused images..."
-            docker image prune -f
+            sudo docker image prune -f
 
             echo "🎉 Deployment completed successfully!"
             
             # 최종 상태 확인
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+            sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
           EOF
 
       - name: Notify deployment status
