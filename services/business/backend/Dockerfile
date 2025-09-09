@@ -56,6 +56,7 @@ RUN poetry config virtualenvs.create false && \
 COPY ./shared ./shared
 COPY ./services/business/backend ./
 
+
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 USER appuser
