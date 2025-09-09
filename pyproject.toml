@@ -1,24 +1,70 @@
 [tool.poetry]
-name = "pilot-project"
-version = "0.1.0"
-description = "Monorepo for marketing service"
+name = "business-service"
+version = "1.0.0"
+description = "Business dashboard and customer management system"
 authors = ["h95fit <h95fit@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.11"
-fastapi = "^0.116.1"
-sqlalchemy = "^2.0.43"
-pymysql = "^1.1.2"
-streamlit = "^1.49.1"
-pandas = "^2.3.2"
-numpy = "^2.3.2"
-pyplotlib = "^0.0.56"
-requests = "^2.32.5"
-uvicorn = "^0.35.0"
+python = "^3.11"
+
+# FastAPI 관련
+fastapi = "^0.104.1"
+uvicorn = {extras = ["standard"], version = "^0.24.0"}
+pydantic = "^2.5.0"
+pydantic-settings = "^2.1.0"
+sqlalchemy = "^2.0.23"
+alembic = "^1.13.1"
+
+# 인증 & 보안
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+boto3 = "^1.34.0"
+botocore = "^1.34.0"
+
+# SSH 터널링
+paramiko = "^3.4.0"
+sshtunnel = "^0.4.0"
+
+# 데이터베이스
+pymysql = "^1.1.0"
+psycopg2-binary = "^2.9.9"
+aiomysql = "^0.2.0"
+supabase = "^2.3.0"
+
+# HTTP 클라이언트
+httpx = "^0.26.0"
+requests = "^2.31.0"
+
+# 프론트엔드
+streamlit = "^1.29.0"
+plotly = "^5.17.0"
+pandas = "^2.1.4"
+
+# 유틸리티
+loguru = "^0.7.2"
+python-multipart = "^0.0.6"
+python-dotenv = "^1.0.0"
+structlog = "^23.2.0"
+typer = "^0.9.0"
+rich = "^13.7.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"
+pytest-asyncio = "^0.21.1"
+pytest-cov = "^4.1.0"
+black = "^23.12.1"
+isort = "^5.13.2"
+flake8 = "^7.0.0"
+mypy = "^1.8.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3

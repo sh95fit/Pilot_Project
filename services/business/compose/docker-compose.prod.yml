@@ -4,6 +4,8 @@ services:
     environment:
       - DEBUG=false
       - LOG_LEVEL=INFO
+    env_file:
+      - ../../../config/main.env   
     # 리소스 제한
     deploy:
       resources:
@@ -23,6 +25,9 @@ services:
   frontend:
     environment:
       - DEBUG=false
+      - LOG_LEVEL=INFO
+    env_file:
+      - ../../../config/main.env   
     deploy:
       resources:
         limits:
