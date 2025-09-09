@@ -95,7 +95,9 @@ jobs:
             # 3️⃣ 환경파일 생성 
             umask 077  # 파일 권한을 600으로 설정
             echo "${{ secrets.BUSINESS_MAIN_ENV }}" > $CONFIG_DIR/main.env
+            echo "${{ secrets.SSH_TUNNEL_KEY }}" > $CONFIG_DIR/ssh_tunnel.pem
             chmod 600 $CONFIG_DIR/main.env
+            chmod 600 $CONFIG_DIR/ssh_tunnel.pem
 
             # 4️⃣ 기존 서비스 헬스체크 및 graceful shutdown
             cd $COMPOSE_DIR
