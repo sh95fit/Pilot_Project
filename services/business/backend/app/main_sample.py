@@ -5,7 +5,7 @@ app = FastAPI(title="Business Backend")
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from Business Backend!"}
+    return {"message": "Hello from Marketing Backend!"}
 
 @app.get("/health")
 def health_check():
