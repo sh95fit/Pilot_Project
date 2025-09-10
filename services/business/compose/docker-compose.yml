@@ -10,6 +10,8 @@ services:
     container_name: business_backend
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-dev}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-dev_password}
     restart: unless-stopped
     networks:
       - business_network
@@ -38,6 +40,33 @@ services:
       backend:
         condition: service_healthy
 
+  redis:
+    image: redis:7-alpine
+    container_name: business_redis
+    restart: unless-stopped
+    networks:
+      - business_network
+    volumes:
+      - redis_data:/data
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-dev_password}
+    command: >
+      sh -c '
+        redis-server
+        --appendonly yes
+        --requirepass "$$REDIS_PASSWORD"
+      '
+    healthcheck:
+      test: ["CMD", "sh", "-c", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
 networks:
   business_network:
     driver: bridge
+
+volumes:
+  redis_data:  
+    driver: local
