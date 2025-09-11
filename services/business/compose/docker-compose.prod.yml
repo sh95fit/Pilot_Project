@@ -18,6 +18,7 @@ services:
         max-file: "3"
 
   backend:
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       - DEBUG=false
       - LOG_LEVEL=INFO
@@ -43,6 +44,7 @@ services:
         max-file: "5"
 
   frontend:
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       - DEBUG=false
       - LOG_LEVEL=INFO

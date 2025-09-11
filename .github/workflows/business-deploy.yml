@@ -105,6 +105,12 @@ jobs:
             chmod 600 $CONFIG_DIR/public_key.pem
             chmod 600 $CONFIG_DIR/redis.conf.template
 
+            # UID/GID 자동 감지 및 설정
+            CURRENT_UID=$(id -u)
+            CURRENT_GID=$(id -g)
+            echo "DOCKER_UID=$CURRENT_UID" >> $CONFIG_DIR/main.env
+            echo "DOCKER_GID=$CURRENT_GID" >> $CONFIG_DIR/main.env
+
             ENV_FILE="$CONFIG_DIR/main.env"
 
             # 4️⃣ 기존 서비스 헬스체크 및 graceful shutdown
