@@ -38,9 +38,9 @@ COPY ./shared/. ./shared
 COPY ./services/business/backend/. ./backend
 
 # 빌드 타임에 권할 설정을 처리하므로 런타임에 실행되는 볼륨 마운트보다 빨라 config 권한 처리가 되지 않음
-# 운영 서버는 우분투 서버로 계정이 ubuntu에 맞춰 권한 세팅 (ubuntu uid = 1001)
+# 운영 서버는 우분투 서버로 계정이 ubuntu에 맞춰 권한 세팅 (ubuntu uid = 1001) -> 워크플로우에서 동적으로 받아 도커컴포즈에서 user로 할당하도록 변경
 # 비특권 사용자 생성 및 권한 설정
-RUN adduser --disabled-password --gecos '' --uid 1001 appuser && \
+RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 
 USER appuser
@@ -60,8 +60,8 @@ RUN poetry config virtualenvs.create false && \
 COPY ./shared/. ./shared
 COPY ./services/business/backend/. ./backend
 
-# 운영 서버는 우분투 서버로 계정이 ubuntu에 맞춰 권한 세팅 (ubuntu uid = 1001)
-RUN adduser --disabled-password --gecos '' --uid 1001 appuser && \
+# 운영 서버는 우분투 서버로 계정이 ubuntu에 맞춰 권한 세팅 (ubuntu uid = 1001) -> 워크플로우에서 동적으로 받아 도커컴포즈에서 user로 할당하도록 변경
+RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 
 USER appuser
