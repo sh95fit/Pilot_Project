@@ -1,0 +1,7 @@
+[server]
+headless = true
+
+[ui]
+hideMainMenu = true      # 사이드 메뉴 숨기기
+hideFooter = true        # 하단 Streamlit 배너 숨기기
+toolbarMode = "viewer"   # 개발자 옵션/Deploy 버튼 숨기기

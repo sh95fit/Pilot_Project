@@ -1,56 +1,37 @@
 import os
 import streamlit as st
-import requests
 
-st.set_page_config(page_title="Cognito Login Demo", page_icon="🔐")
-st.title("🔐 Cognito Login Demo")
-st.write("Hello from Business Frontend!")
+from pages.login import show_login_page
+from pages.dashboard import show_dashboard_page
+from utils.auth_utils import init_session_state, check_authentication
 
-ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
+def hide_streamlit_ui_if_prod():
+    """운영 환경에서 Streamlit 상단 메뉴와 Footer 숨김"""
+    # ENV = os.getenv("ENVIRONMENT") == "prod"
+    ENV = True
+    if ENV:
+        hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}   /* 햄버거 메뉴  */
+            footer {visibility: hidden;}     /* 하단 footer 숨김 */
+            .stDeployButton {visibility: hidden;} /* Deploy 버튼 숨김  */
+            </style>
+        """
+        st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# Backend API 호출 샘플
-backend_url = os.environ.get("BACKEND_URL", "http://business_backend:8000")
+def main():
+    """메인 애플리케이션"""
+    # 세션 상태 초기화
+    init_session_state()
 
-try:
-    resp = requests.get(f"{backend_url}/health")
-    status = resp.json().get("status", "unknown")
-    st.write(f"Backend Health: {status}")
-except Exception as e:
-    st.write(f"Error connecting to backend: {e}")
+    # 운영 모드 UI 처리
+    hide_streamlit_ui_if_prod()
+    
+    # 인증 상태에 따라 페이지 라우팅
+    if check_authentication():
+        show_dashboard_page()
+    else:
+        show_login_page()
 
-
-# Login 테스트
-username = st.text_input("Username")
-password = st.text_input("Password", type="password")
-
-if st.button("Login"):
-    try :
-        # Cognito Auth API 대신 FastAPI에 로그인 요청
-        # FastAPI에서 boto3를 이용해 Cognito로 인증 처리하도록 구성
-        resp = requests.post(f"{backend_url}/auth/login", json={
-            "username": username,
-            "password": password
-        })
-        
-        if resp.status_code == 200:
-            tokens = resp.json()
-            
-            st.success("Login Successful!")
-            st.session_state["access_token"] = tokens["access_token"]
-            
-        else :
-            st.error(f"Login failed: {resp.text}")
-    except Exception as e :
-        st.error(f"Error : {e}")
-
-# 보호된 API 호출 버튼
-if "access_token" in st.session_state:
-    if st.button("Call Protected API"):
-        token = st.session_state["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
-        resp = requests.get(f"{backend_url}/protected", headers=headers)
-        
-        if resp.status_code == 200:
-            st.json(resp.json())
-        else:
-            st.error(f"Protected API call failed: {resp.text}")
+if __name__ == "__main__":
+    main()

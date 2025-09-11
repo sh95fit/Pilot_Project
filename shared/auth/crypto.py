@@ -28,7 +28,7 @@ class CryptoHandler:
         문자열을 암호화하고 base64 인코딩된 문자열 반환
         """
         encrypted = self.fernet.encrypt(data.encode())
-        return base64.urlsafe_b64encode(Encrypted).decode()
+        return base64.urlsafe_b64encode(encrypted).decode()
 
     def decrypt(self, encrypted_data: str) -> str:
         """

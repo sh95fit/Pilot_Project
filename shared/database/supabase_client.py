@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any, List
 import os
 from shared.models.user import User, UserCreate
 from shared.models.session import UserSession, SessionCreate
+from datetime import datetime
 
 class SupabaseClient:
     def __init__(self, supabase_url: str, supabase_key: str):
@@ -72,12 +73,37 @@ class SupabaseClient:
             return None
         
     # Session 처리 메서드
-    async def create_session(self, session_data: SessionCreate) -> Optional[UserSession]:
+    async def create_session(self, session_data: SessionCreate) -> Optional[UserSession]:        
         """
         새 세션 생성
         """
         try:
-            response = self.client.table("user_session").insert(session_data.model_dump()).execute()
+        #     # 사용자 ID 기준으로 기존 유효 세션 조회
+        #     existing_response = self.client.table("user_sessions").select("*") \
+        #         .eq("user_id", str(session_data.user_id)) \
+        #         .eq("revoked", False) \
+        #         .gt("refresh_expires_at", datetime.utcnow().isoformat()) \
+        #         .execute()
+        
+        #     if existing_response.data and len(existing_response.data) > 0:
+        #         # 기존 유효 세션이 있으면 반환
+        #         return UserSession(**existing_response.data[0])
+               # 기존 유효 세션 확인
+            existing_session = await self.get_active_session(session_data.user_id)
+            if existing_session:
+                return existing_session
+            
+            # 신규 세션 생성
+            session_dict = session_data.model_dump()
+            session_dict["user_id"] = str(session_dict["user_id"])             # UUID → str
+            session_dict["session_id"] = str(session_dict["session_id"])       # UUID → str
+            session_dict["refresh_expires_at"] = session_dict["refresh_expires_at"].isoformat()  # datetime → str
+            
+            response = self.client.table("user_sessions").insert(session_dict).execute()
+            
+            # UUID 직렬화 문제 ?
+            # response = self.client.table("user_sessions").insert(session_data.model_dump()).execute()
+            
             if response.data:
                 return UserSession(**response.data[0])
             return None
@@ -151,3 +177,14 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error cleaning up expired sessions: {e}")
             return 0
+        
+    async def get_active_session(self, user_id: str) -> Optional[UserSession]:
+        response = self.client.table("user_sessions")\
+            .select("*")\
+            .eq("user_id", str(user_id))\
+            .eq("revoked", False)\
+            .gt("refresh_expires_at", datetime.utcnow().isoformat())\
+            .execute()
+        if response.data:
+            return UserSession(**response.data[0])
+        return None
