@@ -3,6 +3,8 @@ services:
   redis:
     env_file:
       - ../../../config/main.env
+    volumes:
+      - ../../../config:/app/config:ro
     deploy:
       resources:
         limits:
@@ -24,6 +26,8 @@ services:
       - RELOAD=false
     env_file:
       - ../../../config/main.env  
+    volumes:
+      - ../../../config:/app/config:ro
     ports:
       - "8000:8000" 
     # 리소스 제한
@@ -49,6 +53,8 @@ services:
       - RELOAD=false
     env_file:
       - ../../../config/main.env   
+    volumes:
+      - ../../../config:/app/config:ro
     ports:
       - "8501:8501"
     deploy:
