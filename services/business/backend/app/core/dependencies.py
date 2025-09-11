@@ -1,73 +1,103 @@
-from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Dict, Any, Optional
-import uuid
-from .security import jwt_handler, redis_client, supabase_client
+# from shared.auth.jwt_handler import JWTHandler
+# from shared.auth.crypto import CryptoHandler
+# from shared.auth.cognito_client import CognitoClient
+# from shared.database.supabase_client import SupabaseClient
+# from shared.database.redis_client import RedisClient
+# from .config import settings
 
-security = HTTPBearer(auto_error=False)
+# # 전역 인스턴스 초기화
 
-async def get_current_user_from_cookie(request: Request) -> Dict[str, Any]:
-    """
-    쿠키에서 access token 추출 및 검증
-    """
-    access_token = request.cookies.get("access_token")
-    session_id = request.cookies.get("session_id")
-    
-    if not access_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token missing"
-        )
-    
-    try:
-        payload = jwt_handler.verify_token(access_token)
-        
-        # 세션이 유효한지 확인 (Redis 우선, 없을 경우 Supabase)
-        jti = payload.get('jti') # session_id
-        if jti and not await is_session_active(jti):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Session is not active"
-            )
-        
-        return payload
-    
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e)
-        )
+# jwt_handler = JWTHandler(
+#     private_key = settings.jwt_private_key,
+#     public_key = settings.jwt_public_key,
+#     algorithm = settings.jwt_algorithm,
+#     issuer = settings.jwt_issuer
+# )
 
-async def is_session_active(session_id: str) -> bool:
-    """
-    세션이 활성 상태인지 확인
-    """
-    
-    # Redis 우선 확인
-    redis_session = redis_client.get_session(session_id)
-    if redis_session:
-        return True
-    
-    # Redis에 없으면 Supabase에서 확인
-    db_session = await supabase_client.get_session(session_id)
-    if db_session and not db_session.revoked:
-        # Redis에 다시 캐싱 처리
-        session_data = {
-            "user_id": str(db_session.user_id),
-            "refresh_token_enc": db_session.refresh_token_enc,
-            "refresh_expires_at": db_session.refresh_expires_at.isoformat()
-        }
-        ttl = int((db_session.refresh_expires_at - db_session.created_at).total_seconds())
-        redis_client.set_session(session_id, session_data, ttl)
-        return True
-    
-    return False
+# crypto_handler = CryptoHandler(settings.encryption_key, settings.salt_key)
 
-async def get_optional_current_user(request: Request) -> Optional[Dict[str, Any]]:
-    """
-    선택적 사용자 인증 (토큰이 없어도 오류를 발생시키지 않음)
-    """
-    try:
-        return await get_current_user_from_cookie(request)
-    except HTTPException:
-        return None
+# cognito_client = CognitoClient(
+#     region_name = settings.aws_region,
+#     user_pool_id = settings.cognito_user_pool_id,
+#     client_id = settings.cognito_client_id,
+#     # client_secret=settings.cognito_client_secret
+# )
+
+# supabase_client = SupabaseClient(
+#     supabase_url = settings.supabase_url,
+#     supabase_key = settings.supabase_service_key
+# )
+
+# redis_client = RedisClient(
+#     redis_url = settings.redis_url,
+#     redis_username = settings.redis_username,
+#     redis_password = settings.redis_password
+# )
+
+
+from functools import lru_cache
+from typing import Generator
+from fastapi import Depends
+
+from shared.auth.jwt_handler import JWTHandler
+from shared.auth.crypto import CryptoHandler
+from shared.auth.cognito_client import CognitoClient
+from shared.database.supabase_client import SupabaseClient
+from shared.database.redis_client import RedisClient
+from .config import settings
+
+# 의존성 주입을 위한 팩토리 함수들
+
+@lru_cache()
+def get_jwt_handler() -> JWTHandler:
+    """JWT 핸들러 의존성"""
+    return JWTHandler(
+        private_key=settings.jwt_private_key,
+        public_key=settings.jwt_public_key,
+        algorithm=settings.jwt_algorithm,
+        issuer=settings.jwt_issuer
+    )
+
+@lru_cache()
+def get_crypto_handler() -> CryptoHandler:
+    """암호화 핸들러 의존성"""
+    return CryptoHandler(
+        encryption_key=settings.encryption_key,
+        salt_key=settings.salt_key
+    )
+
+@lru_cache()
+def get_cognito_client() -> CognitoClient:
+    """Cognito 클라이언트 의존성"""
+    return CognitoClient(
+        region_name=settings.aws_region,
+        user_pool_id=settings.cognito_user_pool_id,
+        client_id=settings.cognito_client_id,
+        # client_secret=settings.cognito_client_secret
+    )
+
+@lru_cache()
+def get_supabase_client() -> SupabaseClient:
+    """Supabase 클라이언트 의존성"""
+    return SupabaseClient(
+        supabase_url=settings.supabase_url,
+        supabase_key=settings.supabase_service_key
+    )
+
+@lru_cache()
+def get_redis_client() -> RedisClient:
+    """Redis 클라이언트 의존성"""
+    return RedisClient(
+        redis_url=settings.redis_url,
+        redis_username=settings.redis_username,
+        redis_password=settings.redis_password
+    )
+
+
+# 전역 인스턴스 (기존 코드 호환용 - 점진적 마이그레이션을 위해)
+# 추후 제거 예정
+# jwt_handler = get_jwt_handler()
+# crypto_handler = get_crypto_handler()
+# cognito_client = get_cognito_client()
+# supabase_client = get_supabase_client()
+# redis_client = get_redis_client()
