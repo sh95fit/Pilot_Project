@@ -10,11 +10,18 @@ ENV PYTHONUNBUFFERED=1 \
     POETRY_VENV_IN_PROJECT=1 \
     POETRY_CACHE_DIR=/tmp/poetry_cache
 
-# 시스템 의존성 설치
+# 시스템 의존성 설치 + tzdata 설치 (한국 시간대 적용)
 RUN apt-get update && apt-get install -y \
     curl \
     gcc \
+    tzdata \
+    && ln -fs /usr/share/zoneinfo/Asia/Seoul /etc/localtime \
+    && dpkg-reconfigure --frontend noninteractive tzdata \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# 한국국 시간대 적용
+ENV TZ=Asia/Seoul
 
 # Poetry 설치
 RUN pip install --no-cache-dir poetry

@@ -5,13 +5,31 @@ from ..services.auth_service import AuthService
 from ..core.security import get_current_user_from_cookie
 from ..models.auth import LoginRequest, LoginResponse
 
+from shared.auth.jwt_handler import JWTHandler
+from shared.auth.crypto import CryptoHandler
+from shared.auth.cognito_client import CognitoClient
+from shared.database.supabase_client import SupabaseClient
+from shared.database.redis_client import RedisClient
+from ..core.dependencies import (
+    get_cognito_client, 
+    get_supabase_client, 
+    get_redis_client, 
+    get_jwt_handler, 
+    get_crypto_handler
+)
+
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 @router.post("/login", response_model=LoginResponse)
 async def login(
     login_data: LoginRequest,
     response: Response,
-    request: Request
+    request: Request,
+    cognito_client: CognitoClient = Depends(get_cognito_client),
+    supabase_client: SupabaseClient = Depends(get_supabase_client),
+    redis_client: RedisClient = Depends(get_redis_client),
+    jwt_handler: JWTHandler = Depends(get_jwt_handler),
+    crypto_handler: CryptoHandler = Depends(get_crypto_handler)
 ):
     """
     사용자 로그인
@@ -20,23 +38,52 @@ async def login(
         email=login_data.email,
         password=login_data.password,
         response=response,
-        request=request
+        request=request,
+        cognito_client=cognito_client,
+        supabase_client=supabase_client,
+        redis_client=redis_client,
+        jwt_handler=jwt_handler,
+        crypto_handler=crypto_handler
     )
 
 @router.post("/logout")
-async def logout(response: Response, request: Request):
+async def logout(
+    response: Response, 
+    request: Request,
+    redis_client: RedisClient = Depends(get_redis_client),
+    supabase_client: SupabaseClient = Depends(get_supabase_client)
+    ):
     """
     사용자 로그아웃
     """
     session_id = request.cookies.get("session_id")
+    
     if not session_id:
         raise HTTPException(
             status_code = status.HTTP_400_BAD_REQUEST,
             detail="No active session found"
         )
+        
+    result = await AuthService.logout(
+        session_id=session_id,
+        response=response,
+        redis_client=redis_client,
+        supabase_client=supabase_client
+    )
+    
+    return result    
+        
 
 @router.post("/refresh")
-async def refresh(response: Response, request: Request):
+async def refresh(
+    response: Response, 
+    request: Request,
+    redis_client: RedisClient = Depends(get_redis_client),
+    supabase_client: SupabaseClient = Depends(get_supabase_client),
+    crypto_handler: CryptoHandler = Depends(get_crypto_handler),
+    cognito_client: CognitoClient = Depends(get_cognito_client),
+    jwt_handler: JWTHandler = Depends(get_jwt_handler)
+    ):
     """
     토큰 갱신
     """
@@ -48,7 +95,16 @@ async def refresh(response: Response, request: Request):
             detail="No session ID found"
         )
     
-    success = await AuthService.refresh_tokens(session_id, response)
+    success = await AuthService.refresh_tokens(
+        session_id,
+        response,
+        redis_client,
+        supabase_client,
+        crypto_handler,
+        cognito_client,
+        jwt_handler,
+    )
+    
     if success:
         return {"success": True, "message": "Tokens refreshed successfully"}
     else:
@@ -59,12 +115,13 @@ async def refresh(response: Response, request: Request):
 
 @router.get("/me")
 async def get_current_user(
-    current_user: Dict[str, Any] = Depends(get_current_user_from_cookie)
+    current_user: Dict[str, Any] = Depends(get_current_user_from_cookie),
+    supabase_client: SupabaseClient = Depends(get_supabase_client)
 ):
     """
     현재 사용자 정보 조회
     """
-    return await AuthService.get_current_user_info(current_user)
+    return await AuthService.get_current_user_info(current_user, supabase_client)
 
 @router.get("/check")
 async def check_auth(request: Request):
