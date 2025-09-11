@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --no-cache-dir poetry
 
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 # Poetry 의존성 파일 복사
 COPY pyproject.toml poetry.lock* ./

@@ -2,6 +2,29 @@
 version: "3.9"
 
 services:
+  redis:
+    image: redis:7-alpine
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-dev}
+    container_name: business_redis
+    restart: unless-stopped
+    networks:
+      - business_network
+    volumes:
+      - ../../../config/redis.conf.template:/usr/local/etc/redis/redis.conf.template:ro
+    entrypoint: >
+      sh -c "
+      apk add --no-cache gettext &&
+      envsubst < /usr/local/etc/redis/redis.conf.template > /usr/local/etc/redis/redis.conf &&
+      redis-server /usr/local/etc/redis/redis.conf
+      "
+    healthcheck:
+      test: ["CMD", "sh", "-c", "redis-cli -u redis://$REDIS_USERNAME:$REDIS_PASSWORD@localhost:6379 ping"]
+      interval: 10m
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
   backend:
     build:
       context: ../../../          # 루트 디렉토리를 context로 설정
@@ -10,8 +33,6 @@ services:
     container_name: business_backend
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-dev}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-dev_password}
     restart: unless-stopped
     networks:
       - business_network
@@ -19,7 +40,7 @@ services:
       - ../../../config:/app/config:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
+      interval: 10m
       timeout: 10s
       retries: 5
       start_period: 60s
@@ -39,29 +60,6 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-
-  redis:
-    image: redis:7-alpine
-    container_name: business_redis
-    restart: unless-stopped
-    networks:
-      - business_network
-    volumes:
-      - redis_data:/data
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-dev_password}
-    command: >
-      sh -c '
-        redis-server
-        --appendonly yes
-        --requirepass "$$REDIS_PASSWORD"
-      '
-    healthcheck:
-      test: ["CMD", "sh", "-c", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping"]
-      interval: 1m30s
-      timeout: 30s
-      retries: 5
-      start_period: 30s
 
 networks:
   business_network:
