@@ -105,6 +105,8 @@ jobs:
             chmod 600 $CONFIG_DIR/public_key.pem
             chmod 600 $CONFIG_DIR/redis.conf.template
 
+            ENV_FILE = $CONFIG_DIR/main.env
+
             # 4️⃣ 기존 서비스 헬스체크 및 graceful shutdown
             cd $COMPOSE_DIR
             if sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml ps --services --filter "status=running" | grep -q .; then
@@ -117,7 +119,7 @@ jobs:
             BUILD_TARGET=prod ENVIRONMENT=prod sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
 
             echo "🚢 Starting services..."
-            BUILD_TARGET=prod ENVIRONMENT=prod sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            BUILD_TARGET=prod ENVIRONMENT=prod sudo docker compose --env-file $ENV_FILE -f docker-compose.yml -f docker-compose.prod.yml up -d
 
             # 6️⃣ Nginx 설정 테스트 및 재로드
             echo "🔄 Reloading nginx..."
