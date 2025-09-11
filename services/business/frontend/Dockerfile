@@ -38,9 +38,6 @@ COPY ./services/business/frontend/. ./frontend
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 
-RUN chown -R appuser:appuser /app/config && \
-    chmod 600 /app/config/* 
-
 USER appuser
 
 EXPOSE 8501
@@ -60,9 +57,6 @@ COPY ./services/business/frontend/. ./frontend
 
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
-
-RUN chown -R appuser:appuser /app/config && \
-    chmod 600 /app/config/*
 
 USER appuser
 
