@@ -20,7 +20,7 @@ services:
       "
     healthcheck:
       test: ["CMD", "sh", "-c", "redis-cli -u redis://$REDIS_USERNAME:$REDIS_PASSWORD@localhost:6379 ping"]
-      interval: 10m
+      interval: 1m
       timeout: 30s
       retries: 5
       start_period: 30s
@@ -40,7 +40,7 @@ services:
       - ../../../config:/app/config:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10m
+      interval: 1m
       timeout: 10s
       retries: 5
       start_period: 60s
