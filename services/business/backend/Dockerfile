@@ -42,8 +42,8 @@ RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 
 COPY ./config/ /app/config/
-RUN chown appuser:appuser /app/config/ && \
-    chmod 600 /app/config/
+RUN chown -R appuser:appuser /app/config/ && \
+    chmod -R 600 /app/config/
 
 USER appuser
 
@@ -67,8 +67,8 @@ RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 
 COPY ./config/ /app/config/
-RUN chown appuser:appuser /app/config/ && \
-    chmod 600 /app/config/
+RUN chown -R appuser:appuser /app/config/ && \
+    chmod -R 600 /app/config/
 
 USER appuser
 
