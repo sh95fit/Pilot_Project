@@ -1,5 +1,22 @@
 # services/business/compose/docker-compose.prod.yml
 services:
+  redis:
+    env_file:
+      - ../../../config/main.env
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   backend:
     environment:
       - DEBUG=false
@@ -48,19 +65,3 @@ services:
         max-size: "20m"
         max-file: "5"
   
-  redis:
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: '0.2'
-        reservations:
-          memory: 64M
-          cpus: '0.1'
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
