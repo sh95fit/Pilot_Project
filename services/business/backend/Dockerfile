@@ -40,6 +40,10 @@ COPY ./services/business/backend/. ./backend
 # 비특권 사용자 생성 및 권한 설정
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
+
+RUN chown -R appuser:appuser /app/config && \
+    chmod 600 /app/config/* 
+
 USER appuser
 
 EXPOSE 8000
@@ -60,6 +64,10 @@ COPY ./services/business/backend/. ./backend
 
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
+
+RUN chown -R appuser:appuser /app/config && \
+    chmod 600 /app/config/* 
+
 USER appuser
 
 EXPOSE 8000
