@@ -2,7 +2,7 @@ from fastapi import Request, Response, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from ..services.auth_service import AuthService
-from ..core.dependencies import get_current_user_from_cookie, get_optional_current_user
+from ..core.security import get_current_user_from_cookie, get_optional_current_user
 import json
 
 class AuthMiddleware(BaseHTTPMiddleware):
