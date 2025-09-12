@@ -15,6 +15,20 @@ from ..core.config import settings
 
 class AuthService:
     @staticmethod
+    def _get_cookie_config() -> Dict[str, Any]:
+        """
+        환경에 따른 쿠키 설정 반환
+        """
+        # 환경 설정에서 개발 모드 확인
+        is_dev = getattr(settings, 'environment', 'dev').lower() in ['dev', 'development', 'local']
+
+        return {
+            "httponly": True,
+            "secure": not is_dev,  # 개발환경에서는 False, 운영환경에서는 True
+            "samesite": "lax" if is_dev else "strict",  # 개발환경에서는 더 관대하게
+        }
+
+    @staticmethod
     async def login(
         email: str, 
         password: str, 
@@ -105,22 +119,38 @@ class AuthService:
             )
             
             # 8. 쿠키 설정
+            # response.set_cookie(
+            #     key="access_token",
+            #     value=access_token,
+            #     httponly=True,
+            #     secure=True,
+            #     samesite="strict",
+            #     max_age=settings.jwt_access_token_expire_minutes * 60
+            # )
+            
+            # response.set_cookie(
+            #     key="session_id",
+            #     value=session_id,
+            #     httponly=True,
+            #     secure=True,
+            #     samesite="strict",
+            #     max_age=ttl_seconds
+            # )
+
+            cookie_config = AuthService._get_cookie_config()
+
             response.set_cookie(
                 key="access_token",
                 value=access_token,
-                httponly=True,
-                secure=True,
-                samesite="strict",
-                max_age=settings.jwt_access_token_expire_minutes * 60
+                max_age=settings.jwt_access_token_expire_minutes * 60,
+                **cookie_config
             )
-            
+
             response.set_cookie(
                 key="session_id",
                 value=session_id,
-                httponly=True,
-                secure=True,
-                samesite="strict",
-                max_age=ttl_seconds
+                max_age=ttl_seconds,
+                **cookie_config
             )
             
             return {
@@ -216,13 +246,22 @@ class AuthService:
             )
             
             # 7. 새 access token 쿠키 설정
+            # response.set_cookie(
+            #     key="access_token",
+            #     value=access_token,
+            #     httponly=True,
+            #     secure=True,
+            #     samesite="strict",
+            #     max_age=settings.jwt_access_token_expire_minutes * 60
+            # )
+
+            cookie_config = AuthService._get_cookie_config()
+
             response.set_cookie(
                 key="access_token",
                 value=access_token,
-                httponly=True,
-                secure=True,
-                samesite="strict",
-                max_age=settings.jwt_access_token_expire_minutes * 60
+                max_age=settings.jwt_access_token_expire_minutes * 60,
+                **cookie_config
             )
             
             return True
@@ -250,10 +289,26 @@ class AuthService:
             # 2. Supabase에서 세션 무효화
             await supabase_client.revoke_session(session_id)
             
-            # 3. 쿠키 삭제
-            response.delete_cookie("access_token", path="/")
-            response.delete_cookie("session_id", path="/")   # path : 쿠키가 유효한 경로
+            # 3. 쿠키 삭제 (httponly는 delete_cookie에서 지원하지 않으므로 secure와 samesite만 적용)
+            # response.delete_cookie("access_token", path="/")
+            # response.delete_cookie("session_id", path="/")   # path : 쿠키가 유효한 경로
             
+
+            is_dev = getattr(settings, 'environment', 'dev').lower() in ['dev', 'development', 'local']
+            
+            response.delete_cookie(
+                key="access_token", 
+                path="/",
+                secure=not is_dev,
+                samesite="lax" if is_dev else "strict"
+            )
+            response.delete_cookie(
+                key="session_id", 
+                path="/",
+                secure=not is_dev,
+                samesite="lax" if is_dev else "strict"
+            )
+
             return {"success": True, "message": "Logout successful"}
         
         except Exception as e:

@@ -5,6 +5,9 @@ from ..services.auth_service import AuthService
 from ..core.security import get_current_user_from_cookie, get_optional_current_user
 import json
 
+from ..core.dependencies import get_jwt_handler, get_redis_client, get_supabase_client
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     """
     인증 미들웨어 - 토큰 자동 갱신 처리
@@ -20,6 +23,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         ]
         
     async def dispatch(self, request: Request, call_next):
+        jwt_handler = get_jwt_handler()
+        redis_client = get_redis_client()
+        supabase_client = get_supabase_client()
+
+
         # 제외된 경로는 미들웨어 통과
         if request.url.path in self.excluded_paths:
             return await call_next(request)
@@ -28,7 +36,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if request.url.path.startswith("/api"):
             try:
                 # 토큰 검증 시도
-                user_payload = await get_current_user_from_cookie(request)
+
+                # 미들웨어에서 Depends를 직접 사용해서 객체가 아닌 Depends 자체로 인식하여 문제 발생
+                # user_payload = await get_current_user_from_cookie(request)
+
+                user_payload = await get_current_user_from_cookie(
+                    request,
+                    jwt_handler=jwt_handler,
+                    redis_client=redis_client,
+                    supabase_client=supabase_client
+                )
+
                 # 검증 성공 시 사용자 정보를 request state에 저장
                 request.state.user = user_payload
             
@@ -56,7 +74,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
                                     request._cookies = request.cookies.copy()
                                     request._cookies["access_token"] = new_access_token
                                     
-                                    user_payload = await get_current_user_from_cookie(request)
+                                    # user_payload = await get_current_user_from_cookie(request)
+
+                                    user_payload = await get_current_user_from_cookie(
+                                        request,
+                                        jwt_handler=jwt_handler,
+                                        redis_client=redis_client,
+                                        supabase_client=supabase_client
+                                    )
+
                                     request.state.user = user_payload
                                     
                                     # 원래 요청 처리 후 새 쿠키 헤더 추가

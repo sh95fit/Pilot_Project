@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     environment: str = "dev"
     debug: bool = True
     log_level: str = "DEBUG"
+
+    # CORS 설정
+    allowed_origins: list = ["http://localhost:8501", "http://frontend:8501"]
     
     # AWS Cognito 설정
     aws_region: str
