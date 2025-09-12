@@ -44,8 +44,18 @@ from pages.dashboard import show_dashboard_page
 from utils.auth_utils import init_session_state, check_authentication
 
 def main():
-    st.set_page_config(page_title="Pilot Auth", page_icon="🔐", layout="wide")
+    # 페이지 설정 (사이드바 표시 안 함)
+    st.set_page_config(
+        page_title="Pilot Auth",
+        page_icon="🔐",
+        layout="wide",
+        initial_sidebar_state="collapsed"  # 사이드바 숨기기
+    )
+
+    # 세션 초기화 및 쿠키 복원
     init_session_state()
+
+    # 로그인 상태 확인 후 페이지 전환
     if check_authentication():
         show_dashboard_page()
     else:
