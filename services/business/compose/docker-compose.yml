@@ -11,7 +11,7 @@ services:
     networks:
       - business_network
     volumes:
-      - ../../../config/redis-init.sh:/usr/local/bin/redis-init.sh:ro
+      - ../../../scripts/redis-init.sh:/usr/local/bin/redis-init.sh:ro
       - redis_data:/data
     entrypoint: ["sh", "/usr/local/bin/redis-init.sh"]
     healthcheck:
