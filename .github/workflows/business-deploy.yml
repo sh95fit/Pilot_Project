@@ -98,12 +98,14 @@ jobs:
             echo "${{ secrets.SSH_TUNNEL_KEY }}" > $CONFIG_DIR/ssh_tunnel.pem
             echo "${{ secrets.JWT_PRIVATE_KEY }}" > $CONFIG_DIR/private_key.pem
             echo "${{ secrets.JWT_PUBLIC_KEY }}" > $CONFIG_DIR/public_key.pem
-            echo "${{ secrets.REDIS_CONF_TEMPLATE }}" > $CONFIG_DIR/redis.conf.template
+            echo "${{ secrets.REDIS_CONF_TEMPLATE }}" > $CONFIG_DIR/redis.conf.template  # 미사용(envsubst 환경변수 적용 불안정)
+            echo "${{ secrets.REDIS_INIT }}" > $CONFIG_DIR/redis-init.sh
             chmod 600 $CONFIG_DIR/main.env
             chmod 600 $CONFIG_DIR/ssh_tunnel.pem
             chmod 600 $CONFIG_DIR/private_key.pem
             chmod 600 $CONFIG_DIR/public_key.pem
             chmod 600 $CONFIG_DIR/redis.conf.template
+            chmod 600 $CONFIG_DIR/redis-init.sh
 
             # UID/GID 자동 감지 및 설정
             CURRENT_UID=$(id -u)
