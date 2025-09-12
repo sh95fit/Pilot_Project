@@ -1,4 +1,3 @@
-# services/business/compose/docker-compose.yml
 version: "3.9"
 
 services:
@@ -11,8 +10,14 @@ services:
     networks:
       - business_network
     volumes:
-      - ../../../config/redis-init.sh:/usr/local/bin/redis-init.sh:ro
-    entrypoint: ["sh", "/usr/local/bin/redis-init.sh"]
+      - ../../../config/redis.conf.template:/usr/local/etc/redis/redis.conf.template:ro
+    entrypoint: >
+      sh -c "
+      apk add --no-cache gettext &&
+      envsubst '\$REDIS_USERNAME \$REDIS_PASSWORD' < /usr/local/etc/redis/redis.conf.template > /usr/local/etc/redis/redis.conf &&
+      cat /usr/local/etc/redis/redis.conf &&
+      exec redis-server /usr/local/etc/redis/redis.conf
+      "
     healthcheck:
       test: ["CMD", "sh", "-c", "redis-cli -u redis://$REDIS_USERNAME:$REDIS_PASSWORD@localhost:6379 ping"]
       interval: 1m
