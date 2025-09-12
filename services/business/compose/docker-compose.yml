@@ -12,6 +12,7 @@ services:
       - business_network
     volumes:
       - ../../../config/redis-init.sh:/usr/local/bin/redis-init.sh:ro
+      - redis_data:/data
     entrypoint: ["sh", "/usr/local/bin/redis-init.sh"]
     healthcheck:
       test: ["CMD", "sh", "-c", "redis-cli -u redis://$REDIS_USERNAME:$REDIS_PASSWORD@localhost:6379 ping"]
