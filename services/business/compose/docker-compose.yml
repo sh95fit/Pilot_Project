@@ -15,8 +15,8 @@ services:
     entrypoint: >
       sh -c "
       apk add --no-cache gettext &&
-      envsubst '${REDIS_USERNAME} ${REDIS_PASSWORD}' < /usr/local/etc/redis/redis.conf.template > /usr/local/etc/redis/redis.conf &&
-      redis-server /usr/local/etc/redis/redis.conf
+      envsubst '\$REDIS_USERNAME \$REDIS_PASSWORD' < /usr/local/etc/redis/redis.conf.template > /usr/local/etc/redis/redis.conf &&
+      exec redis-server /usr/local/etc/redis/redis.conf
       "
     healthcheck:
       test: ["CMD", "sh", "-c", "redis-cli -u redis://$REDIS_USERNAME:$REDIS_PASSWORD@localhost:6379 ping"]
