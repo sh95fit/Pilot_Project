@@ -1,18 +1,11 @@
 import streamlit as st
+from utils.auth_utils import login_user, get_auth_status_info
 from components.auth_components import show_login_form
-from utils.auth_utils import init_session_state, check_authentication
 
 def show_login_page():
-    """
-    로그인 페이지
-    """
-    init_session_state()
+    """로그인 페이지"""
     
-    # 이미 인증된 사용자라면 대시보드로 리다이렉트
-    if check_authentication():
-        st.switch_page("pages/dashboard")
-    
-    # 페이지 설정
+    # 페이지 설정 (한 번만)
     st.set_page_config(
         page_title="Login - Pilot Auth",
         page_icon="🔐",
@@ -20,12 +13,19 @@ def show_login_page():
         initial_sidebar_state="collapsed"
     )
     
-    # 중앙 정렬을 위한 컨테이너 할당
-    col1, col2, col3 = st.columns([1,2,1])
+    # 사이드바 숨기기
+    hide_sidebar_style = """
+        <style>
+        [data-testid="stSidebar"] {display: none !important;}
+        </style>
+    """
+    st.markdown(hide_sidebar_style, unsafe_allow_html=True)
     
+    # 중앙 정렬 컨테이너
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         show_login_form()
-        
+    
     # 하단 정보
     st.markdown("---")
     st.markdown(
@@ -37,3 +37,7 @@ def show_login_page():
         """, 
         unsafe_allow_html=True
     )
+    
+    # 개발용 디버그 정보
+    if st.checkbox("🔍 디버그 정보 표시"):
+        st.json(get_auth_status_info())
