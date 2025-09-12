@@ -14,6 +14,8 @@ services:
       - ../../../config/redis.conf.template:/usr/local/etc/redis/redis.conf.template:ro
     entrypoint: >
       sh -c "
+      export REDIS_USERNAME=${REDIS_USERNAME} &&
+      export REDIS_PASSWORD=${REDIS_PASSWORD} &&
       echo '=== Debug Info ===' &&
       echo 'REDIS_USERNAME=' \$REDIS_USERNAME &&
       echo 'REDIS_PASSWORD=' \$REDIS_PASSWORD &&
