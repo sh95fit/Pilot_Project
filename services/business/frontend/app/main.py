@@ -36,30 +36,73 @@
 # if __name__ == "__main__":
 #     main()
 
+#################################################################################
 
+# import streamlit as st
+# from pages.login import show_login_page
+# from pages.dashboard import show_dashboard_page
+# from utils.auth_utils import init_session_state, check_authentication
+
+# def main():
+#     # 페이지 설정 (사이드바 표시 안 함)
+#     st.set_page_config(
+#         page_title="Pilot Auth",
+#         page_icon="🔐",
+#         layout="wide",
+#         initial_sidebar_state="collapsed"  # 사이드바 숨기기
+#     )
+
+#     # 세션 초기화 및 쿠키 복원
+#     init_session_state()
+
+#     # 로그인 상태 확인 후 페이지 전환
+#     if check_authentication():
+#         show_dashboard_page()
+#     else:
+#         show_login_page()
+
+# if __name__ == "__main__":
+#     main()
+
+#################################################################################
 
 import streamlit as st
-from pages.login import show_login_page
-from pages.dashboard import show_dashboard_page
-from utils.auth_utils import init_session_state, check_authentication
+from streamlit_cookies_controller import CookieController
+import requests
+
+BACKEND_URL = "http://localhost:8000"  # FastAPI 백엔드 주소
+cookies = CookieController()
+
+def is_authenticated() -> bool:
+    access_token = cookies.get("access_token")
+    session_id = cookies.get("session_id")
+
+    if not access_token or not session_id:
+        return False
+
+    try:
+        res = requests.get(
+            f"{BACKEND_URL}/auth/check",
+            cookies={
+                "access_token": access_token,
+                "session_id": session_id
+            },
+            timeout=5
+        )
+        return res.ok and res.json().get("authenticated", False)
+    except Exception as e:
+        st.error(f"Auth check failed: {e}")
+        return False
+
 
 def main():
-    # 페이지 설정 (사이드바 표시 안 함)
-    st.set_page_config(
-        page_title="Pilot Auth",
-        page_icon="🔐",
-        layout="wide",
-        initial_sidebar_state="collapsed"  # 사이드바 숨기기
-    )
+    st.set_page_config(page_title="Pilot Project", layout="wide")
 
-    # 세션 초기화 및 쿠키 복원
-    init_session_state()
-
-    # 로그인 상태 확인 후 페이지 전환
-    if check_authentication():
-        show_dashboard_page()
+    if not is_authenticated():
+        st.switch_page("pages/login.py")
     else:
-        show_login_page()
+        st.switch_page("pages/dashboard.py")
+
 
 if __name__ == "__main__":
     main()

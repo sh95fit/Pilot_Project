@@ -48,6 +48,7 @@
 #     def has_cookie(self, name: str) -> bool:
 #         """쿠키 존재 여부 확인"""
 #         return self.get_cookie(name) is not None
+
 import streamlit as st
 from streamlit_cookies_controller import CookieController
 from typing import Optional, Dict

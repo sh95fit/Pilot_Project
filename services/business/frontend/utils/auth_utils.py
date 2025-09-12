@@ -163,16 +163,49 @@ def login_user(email: str, password: str) -> tuple[bool, str]:
     api_client = st.session_state.api_client
     cookie_manager = st.session_state.cookie_manager
 
+    # try:
+    #     result = api_client.login(email, password)
+    #     if result.get("success"):
+    #         for name in ["access_token", "session_id"]:
+    #             val = api_client.session.cookies.get(name)
+    #             if val:
+    #                 cookie_manager.set_cookie(name, val)
+    #         st.session_state.authenticated = True
+    #         st.session_state.user_info = result.get("user")
+    #         # 로그인 성공 후 페이지 전환 (한 번만)
+    #         if not st.session_state.rerun_requested:
+    #             st.session_state.rerun_requested = True
+    #             st.rerun()
+    #         return True, "로그인 성공!"
+    #     else:
+    #         return False, result.get("message", "로그인 실패")
+    # except Exception as e:
+    #     return False, f"로그인 오류: {e}"
+
+
+
     try:
-        result = api_client.login(email, password)
+        res = api_client.session.post(
+            f"{api_client.base_url}/auth/login",
+            json={"email": email, "password": password},
+            timeout=30
+        )
+        res.raise_for_status()
+        result = res.json()
+
         if result.get("success"):
-            for name in ["access_token", "session_id"]:
-                val = api_client.session.cookies.get(name)
-                if val:
-                    cookie_manager.set_cookie(name, val)
+            # 여기서 res.cookies에서 직접 가져오기
+            access_token = res.cookies.get("access_token")
+            session_id = res.cookies.get("session_id")
+
+            if access_token:
+                cookie_manager.set_cookie("access_token", access_token)
+            if session_id:
+                cookie_manager.set_cookie("session_id", session_id)
+
             st.session_state.authenticated = True
             st.session_state.user_info = result.get("user")
-            # 로그인 성공 후 페이지 전환 (한 번만)
+
             if not st.session_state.rerun_requested:
                 st.session_state.rerun_requested = True
                 st.rerun()
@@ -181,6 +214,7 @@ def login_user(email: str, password: str) -> tuple[bool, str]:
             return False, result.get("message", "로그인 실패")
     except Exception as e:
         return False, f"로그인 오류: {e}"
+
 
 # -----------------------------
 # 로그아웃
