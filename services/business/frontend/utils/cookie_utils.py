@@ -48,7 +48,6 @@
 #     def has_cookie(self, name: str) -> bool:
 #         """쿠키 존재 여부 확인"""
 #         return self.get_cookie(name) is not None
-
 import streamlit as st
 from streamlit_cookies_controller import CookieController
 from typing import Optional, Dict
@@ -63,12 +62,11 @@ class StreamlitCookieManager:
         """모든 쿠키 가져오기"""
         try:
             cookies = self.controller.getAll()
-            # None이면 빈 dict로 fallback
             cookies = cookies if cookies is not None else {}
             st.session_state["cookies"] = cookies
             return cookies
         except Exception as e:
-            st.error(f"모든 쿠키 읽기 실패: {e}")
+            st.warning(f"모든 쿠키 읽기 실패: {e}")
             return {}
 
     def get_cookie(self, name: str) -> Optional[str]:
@@ -77,28 +75,28 @@ class StreamlitCookieManager:
             value = self.controller.get(name)
             return value
         except Exception:
-            # controller가 읽기 실패하면 세션 상태 fallback
             return st.session_state.get("cookies", {}).get(name)
 
-    def set_cookie(self, name: str, value: str, expires_days: int = 7) -> bool:
+    def set_cookie(self, name: str, value: str, max_age: int = 7*24*60*60, path: str = "/") -> bool:
         """쿠키 설정"""
         try:
-            self.controller.set(name, value, expires_days=expires_days)
+            self.controller.set(name, value, max_age=max_age, path=path)
             st.session_state.setdefault("cookies", {})[name] = value
             return True
         except Exception as e:
-            st.error(f"쿠키 설정 실패: {e}")
+            st.warning(f"쿠키 설정 실패: {e}")
             return False
 
-    def delete_cookie(self, name: str) -> bool:
+    def delete_cookie(self, name: str, path: str = "/") -> bool:
         """쿠키 삭제"""
         try:
-            self.controller.remove(name)
+            if self.has_cookie(name):
+                self.controller.remove(name, path=path)
             if "cookies" in st.session_state:
                 st.session_state["cookies"].pop(name, None)
             return True
         except Exception as e:
-            st.error(f"쿠키 삭제 실패: {e}")
+            st.warning(f"쿠키 삭제 실패: {e}")
             return False
 
     def has_cookie(self, name: str) -> bool:
