@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  business-backend-green:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: business-backend-green
+    ports:
+      - "8002:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEPLOYMENT_COLOR=green
+    env_file:
+      - ../.env
+    networks:
+      - business-network
+    restart: unless-stopped
+    labels:
+      - "deployment=green"
+
+  business-frontend-green:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: business-frontend-green
+    ports:
+      - "8503:8501"
+    environment:
+      - API_BASE_URL=http://business-backend-green:8000/api/v1
+      - DEPLOYMENT_COLOR=green
+    env_file:
+      - ../.env
+    networks:
+      - business-network
+    restart: unless-stopped
+    depends_on:
+      - business-backend-green
+    labels:
+      - "deployment=green"
+
+networks:
+  business-network:
+    external: true
