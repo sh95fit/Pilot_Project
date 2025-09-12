@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  business-backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: business-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - API_V1_STR=/api/v1
+    env_file:
+      - ../.env
+    networks:
+      - business-network
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - postgres
+
+  business-frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: business-frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - API_BASE_URL=http://business-backend:8000/api/v1
+      - ENVIRONMENT=production
+    env_file:
+      - ../.env
+    networks:
+      - business-network
+    restart: unless-stopped
+    depends_on:
+      - business-backend
+
+  postgres:
+    image: postgres:15
+    container_name: business-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-business_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - business-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: business-redis
+    networks:
+      - business-network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: business-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - business-network
+    restart: unless-stopped
+    depends_on:
+      - business-backend
+      - business-frontend
+
+volumes:
+  postgres_data:
+
+networks:
+  business-network:
+    driver: bridge

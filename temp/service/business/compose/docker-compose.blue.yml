@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  business-backend-blue:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: business-backend-blue
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEPLOYMENT_COLOR=blue
+    env_file:
+      - ../.env
+    networks:
+      - business-network
+    restart: unless-stopped
+    labels:
+      - "deployment=blue"
+
+  business-frontend-blue:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: business-frontend-blue
+    ports:
+      - "8501:8501"
+    environment:
+      - API_BASE_URL=http://business-backend-blue:8000/api/v1
+      - DEPLOYMENT_COLOR=blue
+    env_file:
+      - ../.env
+    networks:
+      - business-network
+    restart: unless-stopped
+    depends_on:
+      - business-backend-blue
+    labels:
+      - "deployment=blue"
+
+networks:
+  business-network:
+    external: true
