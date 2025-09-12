@@ -66,7 +66,7 @@ jobs:
 
       - name: Deploy to OCI server
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SERVER_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SERVER_IP }} << 'EOF'
             set -e
             
             PROJECT_DIR="/opt/Pilot_Project"
@@ -100,8 +100,13 @@ jobs:
             echo "${{ secrets.JWT_PUBLIC_KEY }}" > $CONFIG_DIR/public_key.pem
             echo "${{ secrets.REDIS_CONF_TEMPLATE }}" > $CONFIG_DIR/redis.conf.template  # 미사용(envsubst 환경변수 적용 불안정)
 
-            # REDIS_INIT는 멀티라인 안전하게 처리
-            printf '%s' "${{ secrets.REDIS_INIT }}" > $CONFIG_DIR/redis-init.sh
+            # REDIS_INIT Secret를 Base64로 인코딩
+            ENCODED_REDIS_INIT=$(echo "${{ secrets.REDIS_INIT }}" | base64)
+
+            # REDIS_INIT 안전하게 파일 생성 (Base64 디코딩)
+            echo "$ENCODED_REDIS_INIT" | base64 --decode > \$CONFIG_DIR/redis-init.sh
+            chmod 600 \$CONFIG_DIR/redis-init.sh
+
 
             chmod 600 $CONFIG_DIR/main.env
             chmod 600 $CONFIG_DIR/ssh_tunnel.pem
