@@ -58,10 +58,6 @@ FROM base AS prod
 RUN poetry config virtualenvs.create false && \
     poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
 
-# 동적 UID/GID 지원
-# ARG USER_UID=1000
-# ARG USER_GID=1000
-
 # 비특권 사용자 생성 및 권한 설정
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
