@@ -67,12 +67,13 @@ RUN poetry config virtualenvs.create false && \
 COPY ./shared/. ./shared
 COPY ./services/business/backend/. ./backend
 
-ARG USER_UID=1000
-ARG USER_GID=1000
+# ARG USER_UID=1000
+# ARG USER_GID=1000
 
 # 운영 서버는 우분투 서버로 계정이 ubuntu에 맞춰 권한 세팅 (ubuntu uid = 1001) -> 워크플로우에서 동적으로 받아 도커컴포즈에서 user로 할당하도록 변경
 RUN addgroup --gid $USER_GID appuser && \
-    adduser --disabled-password --gecos '' --uid $USER_UID --gid $USER_GID appuser && \
+    # adduser --disabled-password --gecos '' --uid $USER_UID --gid $USER_GID appuser && \
+    adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 
 USER appuser
