@@ -1,7 +1,59 @@
+# Streamlit 설정 파일 - 프로덕션 환경용
+# services/business/frontend/.streamlit/config.toml
+
+[global]
+# 개발 모드 비활성화 (프로덕션 환경)
+developmentMode = false
+
+# 데이터프레임 표시 최대 행 수
+maxUploadSize = 200
+
 [server]
+# 헤드리스 모드 (브라우저 자동 실행 안함)
 headless = true
 
-[ui]
-hideMainMenu = true      # 사이드 메뉴 숨기기
-hideFooter = true        # 하단 Streamlit 배너 숨기기
-toolbarMode = "viewer"   # 개발자 옵션/Deploy 버튼 숨기기
+# 서버 주소 및 포트
+address = "0.0.0.0"
+port = 8501
+
+# CORS 비활성화 (보안)
+enableCORS = false
+
+# XSRF 보호 비활성화 (컨테이너 환경)
+enableXsrfProtection = false
+
+# 웹소켓 압축 활성화 (성능 향상)
+enableWebsocketCompression = true
+
+# 정적 파일 캐싱 활성화
+enableStaticServing = true
+
+# 파일 감시 비활성화 (프로덕션에서 불필요)
+runOnSave = false
+fileWatcherType = "none"
+
+[browser]
+# 사용자 통계 수집 비활성화
+gatherUsageStats = false
+
+# 서버 연결 확인 비활성화
+serverAddress = "0.0.0.0"
+serverPort = 8501
+
+[client]
+# 에러 세부사항 표시 비활성화 (보안)
+showErrorDetails = false
+
+# 도구 모음 모드 설정
+toolbarMode = "minimal"
+
+[theme]
+# 다크 모드 설정 (선택사항)
+base = "light"
+
+[logger]
+# 로깅 레벨 설정
+level = "info"
+
+# 로그 메시지 포맷
+messageFormat = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
