@@ -1,4 +1,5 @@
 # services/business/frontend/Dockerfile
+# services/business/frontend/Dockerfile
 FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
@@ -50,7 +51,7 @@ EXPOSE 8501
 CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
 
 # =========================
-# 프로덕션 단계 - 최소한의 변경으로 권한 이슈만 해결
+# 프로덕션 단계 - 완전한 권한 이슈 해결
 # =========================
 FROM base AS prod
 
@@ -66,14 +67,32 @@ RUN adduser --disabled-password --gecos '' --uid 1000 appuser && \
     mkdir -p /home/appuser/.streamlit && \
     mkdir -p /home/appuser/.config && \
     mkdir -p /home/appuser/.cache && \
-    mkdir -p /home/appuser/.local && \
+    mkdir -p /home/appuser/.local/share && \
     chown -R appuser:appuser /app /home/appuser && \
     chmod -R 755 /home/appuser
 
-# 환경 변수 설정 (권한 이슈 방지)
+# Streamlit 설정 파일 미리 생성 (핵심!)
+RUN echo '[global]' > /home/appuser/.streamlit/config.toml && \
+    echo 'developmentMode = false' >> /home/appuser/.streamlit/config.toml && \
+    echo '[server]' >> /home/appuser/.streamlit/config.toml && \
+    echo 'headless = true' >> /home/appuser/.streamlit/config.toml && \
+    echo 'enableCORS = false' >> /home/appuser/.streamlit/config.toml && \
+    echo 'enableXsrfProtection = false' >> /home/appuser/.streamlit/config.toml && \
+    echo '[browser]' >> /home/appuser/.streamlit/config.toml && \
+    echo 'gatherUsageStats = false' >> /home/appuser/.streamlit/config.toml && \
+    chown -R appuser:appuser /home/appuser/.streamlit
+
+# 환경 변수 설정 (완전한 권한 이슈 방지)
 ENV HOME=/home/appuser \
     USER=appuser \
-    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+    STREAMLIT_CONFIG_DIR=/home/appuser/.streamlit \
+    XDG_CONFIG_HOME=/home/appuser/.config \
+    XDG_CACHE_HOME=/home/appuser/.cache \
+    XDG_DATA_HOME=/home/appuser/.local/share \
+    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \
+    STREAMLIT_SERVER_HEADLESS=true \
+    STREAMLIT_SERVER_ENABLE_CORS=false \
+    STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
 
 USER appuser
 
