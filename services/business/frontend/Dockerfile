@@ -79,6 +79,8 @@ ENV HOME=/home/appuser \
     STREAMLIT_SERVER_ENABLE_CORS=false \
     STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
 
+USER appuser
+
 RUN poetry config virtualenvs.create false && \
     poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
 
@@ -87,8 +89,6 @@ COPY ./shared/. ./shared
 COPY ./services/business/frontend/. ./frontend
 
 COPY services/business/frontend/.streamlit/config.toml /home/appuser/.streamlit/config.toml
-
-USER appuser
 
 EXPOSE 8501
 CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
