@@ -55,39 +55,9 @@ CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", "--server.addr
 # =========================
 FROM base AS prod
 
-RUN poetry config virtualenvs.create false && \
-    poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
-
-# 소스 코드 복사
-COPY ./shared/. ./shared
-COPY ./services/business/frontend/. ./frontend
-
 # 동적 UID/GID 지원
 ARG USER_UID=1000
 ARG USER_GID=1000
-
-# 사용자 생성 및 필요한 디렉토리 미리 생성 (권한 이슈 해결)
-RUN addgroup --gid $USER_GID appuser && \
-    adduser --disabled-password --gecos '' --uid $USER_UID --gid $USER_GID appuser && \
-    mkdir -p /home/appuser/.streamlit && \
-    mkdir -p /home/appuser/.config && \
-    mkdir -p /home/appuser/.cache && \
-    chown -R appuser:appuser /app /home/appuser
-
-
-# Streamlit 설정 파일 미리 생성 (핵심!)
-# RUN echo '[global]' > /home/appuser/.streamlit/config.toml && \
-#     echo 'developmentMode = false' >> /home/appuser/.streamlit/config.toml && \
-#     echo '[server]' >> /home/appuser/.streamlit/config.toml && \
-#     echo 'headless = true' >> /home/appuser/.streamlit/config.toml && \
-#     echo 'enableCORS = false' >> /home/appuser/.streamlit/config.toml && \
-#     echo 'enableXsrfProtection = false' >> /home/appuser/.streamlit/config.toml && \
-#     echo '[browser]' >> /home/appuser/.streamlit/config.toml && \
-#     echo 'gatherUsageStats = false' >> /home/appuser/.streamlit/config.toml && \
-#     chown -R appuser:appuser /home/appuser/.streamlit
-
-COPY services/business/frontend/.streamlit/config.toml /home/appuser/.streamlit/config.toml
-RUN chown -R appuser:appuser /home/appuser/.streamlit
 
 # # 환경 변수 설정 (완전한 권한 이슈 방지)
 ENV HOME=/home/appuser \
@@ -100,6 +70,23 @@ ENV HOME=/home/appuser \
     STREAMLIT_SERVER_HEADLESS=true \
     STREAMLIT_SERVER_ENABLE_CORS=false \
     STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
+
+# 사용자 생성 및 필요한 디렉토리 미리 생성 (권한 이슈 해결)
+RUN addgroup --gid $USER_GID appuser && \
+    adduser --disabled-password --gecos '' --uid $USER_UID --gid $USER_GID appuser && \
+    mkdir -p /home/appuser/.streamlit && \
+    mkdir -p /home/appuser/.config && \
+    mkdir -p /home/appuser/.cache && \
+    chown -R appuser:appuser /app /home/appuser
+
+RUN poetry config virtualenvs.create false && \
+    poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
+
+# 소스 코드 복사
+COPY ./shared/. ./shared
+COPY ./services/business/frontend/. ./frontend
+
+COPY services/business/frontend/.streamlit/config.toml /home/appuser/.streamlit/config.toml
 
 USER appuser
 
