@@ -26,9 +26,9 @@ services:
       context: ../../../          # 루트 디렉토리를 context로 설정
       dockerfile: services/business/backend/Dockerfile
       target: ${BUILD_TARGET:-dev}
-      args:
-        - USER_UID=${DOCKER_UID:-1000}
-        - USER_GID=${DOCKER_GID:-1000}
+      # args:
+      #   - USER_UID=${DOCKER_UID:-1000}
+      #   - USER_GID=${DOCKER_GID:-1000}
     container_name: business_backend
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-dev}
@@ -49,9 +49,9 @@ services:
       context: ../../../          # 루트 디렉토리를 context로 설정
       dockerfile: services/business/frontend/Dockerfile
       target: ${BUILD_TARGET:-dev}
-      args:
-        - USER_UID=${DOCKER_UID:-1000}
-        - USER_GID=${DOCKER_GID:-1000}
+      # args:
+      #   - USER_UID=${DOCKER_UID:-1000}
+      #   - USER_GID=${DOCKER_GID:-1000}
     container_name: business_frontend
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-dev}
