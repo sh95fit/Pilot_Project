@@ -25,6 +25,9 @@ RUN pip install --no-cache-dir poetry
 WORKDIR /app
 ENV PYTHONPATH=/app/frontend
 
+# .streamlit 설치 경로 조정
+ENV HOME=/app/frontend
+
 # Poetry 의존성 파일 복사
 COPY pyproject.toml poetry.lock* ./
 
