@@ -25,9 +25,6 @@ RUN pip install --no-cache-dir poetry
 WORKDIR /app
 ENV PYTHONPATH=/app/frontend
 
-# .streamlit, .config/pypoetry/config.toml 권한 이슈 조치
-ENV HOME=/tmp
-
 # Poetry 의존성 파일 복사
 COPY pyproject.toml poetry.lock* ./
 
@@ -66,7 +63,14 @@ COPY ./shared/. ./shared
 COPY ./services/business/frontend/. ./frontend
 
 RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
+    mkdir -p /home/appuser && \
+    chown -R appuser:appuser /app /home/appuser
+
+# .streamlit, .config/pypoetry/config.toml 권한 이슈 조치
+ENV HOME=/home/appuser \
+    XDG_CONFIG_HOME=$HOME/.config \
+    XDG_CACHE_HOME=$HOME/.cache \
+    XDG_DATA_HOME=$HOME/.local/share
 
 USER appuser
 
