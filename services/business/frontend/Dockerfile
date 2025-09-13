@@ -33,6 +33,9 @@ COPY pyproject.toml poetry.lock* ./
 COPY ./shared/. ./shared
 COPY ./services/business/frontend/. ./frontend
 
+# config.toml을 /app/.streamlit으로 복사
+COPY ./services/business/frontend/.streamlit/config.toml /app/.streamlit/config.toml
+
 # =========================
 # 개발 단계
 # =========================
@@ -61,6 +64,13 @@ RUN poetry config virtualenvs.create false && \
 # 비특권 사용자 생성 및 권한 설정
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
+
+# HOME 환경 변수 설정 (streamlit이 /app/.streamlit에 접근하도록)
+ENV HOME=/app
+
+# .streamlit 디렉토리 생성 및 권한 부여
+RUN mkdir -p /app/.streamlit \
+    && chown -R appuser:appuser /app/.streamlit
 
 USER appuser
 
