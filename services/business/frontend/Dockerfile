@@ -67,7 +67,8 @@ ARG USER_UID=1000
 ARG USER_GID=1000
 
 # 사용자 생성 및 필요한 디렉토리 미리 생성 (권한 이슈 해결)
-RUN adduser --disabled-password --gecos '' --uid $USER_UID appuser && \
+RUN addgroup --gid $USER_GID appuser && \
+    adduser --disabled-password --gecos '' --uid $USER_UID --gid $USER_GID appuser && \
     mkdir -p /home/appuser/.streamlit && \
     mkdir -p /home/appuser/.config && \
     mkdir -p /home/appuser/.cache && \
