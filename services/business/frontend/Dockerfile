@@ -40,7 +40,6 @@ RUN poetry config virtualenvs.create false && \
 COPY ./shared/. ./shared
 COPY ./services/business/frontend/. ./frontend
 
-
 # 비특권 사용자 생성 및 권한 설정
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
@@ -51,7 +50,7 @@ EXPOSE 8501
 CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
 
 # =========================
-# 프로덕션 단계
+# 프로덕션 단계 - 최소한의 변경으로 권한 이슈만 해결
 # =========================
 FROM base AS prod
 
@@ -62,15 +61,19 @@ RUN poetry config virtualenvs.create false && \
 COPY ./shared/. ./shared
 COPY ./services/business/frontend/. ./frontend
 
-RUN adduser --disabled-password --gecos '' appuser && \
-    mkdir -p /home/appuser && \
-    chown -R appuser:appuser /app /home/appuser
+# 사용자 생성 및 필요한 디렉토리 미리 생성 (권한 이슈 해결)
+RUN adduser --disabled-password --gecos '' --uid 1000 appuser && \
+    mkdir -p /home/appuser/.streamlit && \
+    mkdir -p /home/appuser/.config && \
+    mkdir -p /home/appuser/.cache && \
+    mkdir -p /home/appuser/.local && \
+    chown -R appuser:appuser /app /home/appuser && \
+    chmod -R 755 /home/appuser
 
-# .streamlit, .config/pypoetry/config.toml 권한 이슈 조치
+# 환경 변수 설정 (권한 이슈 방지)
 ENV HOME=/home/appuser \
-    XDG_CONFIG_HOME=$HOME/.config \
-    XDG_CACHE_HOME=$HOME/.cache \
-    XDG_DATA_HOME=$HOME/.local/share
+    USER=appuser \
+    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 
 USER appuser
 
