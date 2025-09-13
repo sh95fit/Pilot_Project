@@ -67,42 +67,15 @@
 #################################################################################
 
 import streamlit as st
-from streamlit_cookies_controller import CookieController
-import requests
 
-BACKEND_URL = "http://localhost:8000"  # FastAPI 백엔드 주소
-cookies = CookieController()
+# 페이지 기본 설정
+st.set_page_config(
+    page_title="Test",        # 브라우저 탭 제목
+    page_icon="🍱",             # 파비콘 (emoji 또는 이미지 URL)
+    layout="centered",          # 레이아웃 (centered, wide)
+    initial_sidebar_state="auto"  # 사이드바 초기 상태
+)
 
-def is_authenticated() -> bool:
-    access_token = cookies.get("access_token")
-    session_id = cookies.get("session_id")
-
-    if not access_token or not session_id:
-        return False
-
-    try:
-        res = requests.get(
-            f"{BACKEND_URL}/auth/check",
-            cookies={
-                "access_token": access_token,
-                "session_id": session_id
-            },
-            timeout=5
-        )
-        return res.ok and res.json().get("authenticated", False)
-    except Exception as e:
-        st.error(f"Auth check failed: {e}")
-        return False
-
-
-def main():
-    st.set_page_config(page_title="Pilot Project", layout="wide")
-
-    if not is_authenticated():
-        st.switch_page("pages/login.py")
-    else:
-        st.switch_page("pages/dashboard.py")
-
-
-if __name__ == "__main__":
-    main()
+# 최소 표시용
+st.title("Hello, Streamlit!")
+st.write("Main page is working!")
