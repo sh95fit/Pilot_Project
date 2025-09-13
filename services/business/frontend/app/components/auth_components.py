@@ -131,6 +131,55 @@
 
 #################################################################################
 
+# import streamlit as st
+# from utils.auth_utils import login_user, logout_user, get_auth_status_info
+
+# def show_login_form():
+#     """로그인 폼 컴포넌트"""
+    
+#     st.title("🔐 로그인")
+    
+#     with st.form("login_form"):
+#         email = st.text_input("이메일", placeholder="이메일 주소를 입력하세요")
+#         password = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요")
+#         submit_button = st.form_submit_button("로그인", use_container_width=True)
+        
+#         if submit_button:
+#             if not email or not password:
+#                 st.error("모든 필드를 입력해주세요")
+#                 return
+#             with st.spinner("로그인 중..."):
+#                 success, message = login_user(email, password)
+#                 if success:
+#                     st.success(message)
+#                     st.rerun()
+#                 else:
+#                     st.error(message)
+
+# def show_logout_button():
+#     """로그아웃 버튼"""
+#     if st.button("🚪 로그아웃", use_container_width=True):
+#         with st.spinner("로그아웃 중..."):
+#             success, message = logout_user()
+#             if success:
+#                 st.success(message)
+#                 st.rerun()
+#             else:
+#                 st.error(message)
+
+# def show_user_info(user_info: dict):
+#     """사용자 정보 표시 사이드바"""
+#     st.sidebar.markdown("---")
+#     st.sidebar.markdown("### 👤 사용자 정보")
+#     st.sidebar.markdown(f"**이메일:** {user_info.get('email', 'N/A')}")
+#     st.sidebar.markdown(f"**이름:** {user_info.get('display_name', 'N/A')}")
+#     st.sidebar.markdown(f"**역할:** {user_info.get('role', 'N/A')}")
+    
+#     st.sidebar.markdown("---")
+#     show_logout_button()
+
+
+
 import streamlit as st
 from utils.auth_utils import login_user, logout_user, get_auth_status_info
 
@@ -177,4 +226,3 @@ def show_user_info(user_info: dict):
     
     st.sidebar.markdown("---")
     show_logout_button()
-

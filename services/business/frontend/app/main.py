@@ -65,17 +65,30 @@
 #     main()
 
 #################################################################################
-
 import streamlit as st
+from pages import login, dashboard
+from utils.auth_utils import get_auth_status_info
 
 # 페이지 기본 설정
 st.set_page_config(
-    page_title="Test",        # 브라우저 탭 제목
-    page_icon="🍱",             # 파비콘 (emoji 또는 이미지 URL)
-    layout="centered",          # 레이아웃 (centered, wide)
-    initial_sidebar_state="auto"  # 사이드바 초기 상태
+    page_title="런치랩",
+    page_icon="🍱",
+    layout="wide"
 )
 
-# 최소 표시용
-st.title("Hello, Streamlit!")
-st.write("Main page is working!")
+# URL 파라미터 기반 페이지 선택
+query_params = st.experimental_get_query_params()
+current_page = query_params.get("page", ["main"])[0]
+
+# 인증 상태 확인
+auth_info = get_auth_status_info()
+authenticated = auth_info.get("authenticated", False)
+
+# 페이지 라우팅
+if not authenticated:
+    login.show_login_form()
+elif current_page == "dashboard":
+    st.sidebar.markdown(f"### 👋 {auth_info['user_info'].get('display_name', '사용자')}님 환영합니다!")
+    dashboard.show_dashboard()
+else:
+    st.write("메인 페이지입니다.")
