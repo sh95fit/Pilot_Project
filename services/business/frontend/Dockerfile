@@ -62,27 +62,33 @@ RUN poetry config virtualenvs.create false && \
 COPY ./shared/. ./shared
 COPY ./services/business/frontend/. ./frontend
 
+# 동적 UID/GID 지원
+ARG USER_UID=1000
+ARG USER_GID=1000
+
 # 사용자 생성 및 필요한 디렉토리 미리 생성 (권한 이슈 해결)
-RUN adduser --disabled-password --gecos '' --uid 1000 appuser && \
+RUN adduser --disabled-password --gecos '' --uid $USER_UID appuser && \
     mkdir -p /home/appuser/.streamlit && \
     mkdir -p /home/appuser/.config && \
     mkdir -p /home/appuser/.cache && \
-    mkdir -p /home/appuser/.local/share && \
-    chown -R appuser:appuser /app /home/appuser && \
-    chmod -R 755 /home/appuser
+    chown -R appuser:appuser /app /home/appuser
+
 
 # Streamlit 설정 파일 미리 생성 (핵심!)
-RUN echo '[global]' > /home/appuser/.streamlit/config.toml && \
-    echo 'developmentMode = false' >> /home/appuser/.streamlit/config.toml && \
-    echo '[server]' >> /home/appuser/.streamlit/config.toml && \
-    echo 'headless = true' >> /home/appuser/.streamlit/config.toml && \
-    echo 'enableCORS = false' >> /home/appuser/.streamlit/config.toml && \
-    echo 'enableXsrfProtection = false' >> /home/appuser/.streamlit/config.toml && \
-    echo '[browser]' >> /home/appuser/.streamlit/config.toml && \
-    echo 'gatherUsageStats = false' >> /home/appuser/.streamlit/config.toml && \
-    chown -R appuser:appuser /home/appuser/.streamlit
+# RUN echo '[global]' > /home/appuser/.streamlit/config.toml && \
+#     echo 'developmentMode = false' >> /home/appuser/.streamlit/config.toml && \
+#     echo '[server]' >> /home/appuser/.streamlit/config.toml && \
+#     echo 'headless = true' >> /home/appuser/.streamlit/config.toml && \
+#     echo 'enableCORS = false' >> /home/appuser/.streamlit/config.toml && \
+#     echo 'enableXsrfProtection = false' >> /home/appuser/.streamlit/config.toml && \
+#     echo '[browser]' >> /home/appuser/.streamlit/config.toml && \
+#     echo 'gatherUsageStats = false' >> /home/appuser/.streamlit/config.toml && \
+#     chown -R appuser:appuser /home/appuser/.streamlit
 
-# 환경 변수 설정 (완전한 권한 이슈 방지)
+COPY services/business/frontend/.streamlit/config.toml /home/appuser/.streamlit/config.toml
+RUN chown -R appuser:appuser /home/appuser/.streamlit
+
+# # 환경 변수 설정 (완전한 권한 이슈 방지)
 ENV HOME=/home/appuser \
     USER=appuser \
     STREAMLIT_CONFIG_DIR=/home/appuser/.streamlit \
