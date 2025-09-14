@@ -1,5 +1,4 @@
 # services/business/frontend/Dockerfile
-# services/business/frontend/Dockerfile
 FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
