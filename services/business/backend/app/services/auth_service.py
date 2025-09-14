@@ -161,6 +161,10 @@ class AuthService:
                     "email": user.email,
                     "display_name": user.display_name,
                     "role": user.role
+                },
+                "tokens": {         # 쿠키를 streamlit에서 처리하지 못해 json으로 전달하여 streamlit이 처리하도록 유도
+                    "access_token": access_token,
+                    "session_id": session_id
                 }
             }
         
