@@ -31,6 +31,9 @@ class SessionManager:
         
         if SessionManager.USER_INFO_KEY not in st.session_state:
             st.session_state[SessionManager.USER_INFO_KEY] = None
+        
+        if "redirect_to" not in st.session_state:
+            st.session_state["redirect_to"] = None
     
     @staticmethod
     def is_authenticated() -> bool:
@@ -170,6 +173,10 @@ class SessionManager:
             
             # 3. 쿠키 클리어 플래그 설정
             cookie_manager.clear_auth_cookies()
+            
+            st.session_state["authenticated"] = False
+            st.session_state["user_info"] = None
+            st.session_state["redirect_to"] = "login"             
             
             if success:
                 # 4. 성공 시 페이지 새로고침하여 쿠키 반영
