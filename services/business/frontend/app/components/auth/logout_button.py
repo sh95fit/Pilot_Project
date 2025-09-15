@@ -67,15 +67,18 @@ def _handle_logout():
         with st.spinner("로그아웃 중..."):
             success, error_msg = SessionManager.logout()
             
+        # 페이지 이동 플래그 설정
+        st.experimental_set_query_params(page="login")
+                       
         # SessionManager.logout()에서 이미 페이지 리다이렉트 처리됨
-        # 여기서는 추가 처리 불필요
+        # 여기서는 추가 처리 불필요 -> 페이지 겹침 이슈 확인
         
     except Exception as e:
         st.error(f"로그아웃 처리 중 오류 발생: {str(e)}")
         # 오류 발생 시에도 강제로 로그인 페이지로 이동
         import time
         time.sleep(1)
-        st.switch_page("app.py")
+        st.switch_page("main.py")
 
 
 def render_user_menu():
