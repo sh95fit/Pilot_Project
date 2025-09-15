@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 import streamlit as st
 from utils.auth_client import auth_client
 from utils.cookie_manager import cookie_manager
+from config.settings import settings
 
 
 class SessionManager:
@@ -132,7 +133,7 @@ class SessionManager:
                     cookie_manager.controller.set(
                         settings.ACCESS_TOKEN_COOKIE_NAME,
                         tokens.get("access_token"),
-                        max_age=settings.jwt_access_token_expire_minutes * 60
+                        max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
                     )
 
                     # Session ID 저장

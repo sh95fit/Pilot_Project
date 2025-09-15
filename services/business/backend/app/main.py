@@ -39,7 +39,7 @@ def create_app() -> FastAPI:
     # CORS 설정
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:8501", "http://frontend:8501"],
+        allow_origins=["http://localhost:8501", "http://frontend:8501", "http://127.0.0.1:8501", "https://prototype.lunchlab.me"],
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],

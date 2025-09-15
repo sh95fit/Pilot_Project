@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 import uuid
-from fastapi import HTTPException, Response, Request, Depends
+from fastapi import HTTPException, Response, Request, status
+import logging
 
 from shared.models.user import UserCreate
 from shared.models.session import SessionCreate
@@ -11,6 +12,8 @@ from shared.auth.cognito_client import CognitoClient
 from shared.database.supabase_client import SupabaseClient
 from shared.database.redis_client import RedisClient
 from ..core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -34,13 +37,6 @@ class AuthService:
         password: str, 
         response: Response, 
         request: Request,
-        # staticmethod와 Depends의 충돌 이슈 발생
-        # 의존성 주입은 라우터 함수에서만 동작 -> 라우터 단에서 의존성 주입하도록 수정
-        # cognito_client: CognitoClient = Depends(get_cognito_client),
-        # supabase_client: SupabaseClient = Depends(get_supabase_client),
-        # redis_client: RedisClient = Depends(get_redis_client),
-        # jwt_handler: JWTHandler = Depends(get_jwt_handler),
-        # crypto_handler: CryptoHandler = Depends(get_crypto_handler)
         cognito_client: CognitoClient,  
         supabase_client: SupabaseClient,  
         redis_client: RedisClient,  
@@ -52,12 +48,12 @@ class AuthService:
         """
         try:
             # 1. Cognito 인증
-            cognito_tokens = cognito_client.authenticate_user(email, password)
+            cognito_tokens = await cognito_client.authenticate_user(email, password)
             if not cognito_tokens:
                 raise HTTPException(status_code=401, detail="Invalid credentials")
             
             # 2. Cognito에서 사용자 정보 가져오기
-            user_info = cognito_client.get_user_info(cognito_tokens['access_token'])
+            user_info = await cognito_client.get_user_info(cognito_tokens['access_token'])
             if not user_info:
                 raise HTTPException(status_code=500, detail="Failed to get user info")
             
@@ -73,6 +69,10 @@ class AuthService:
             if not user:
                 raise HTTPException(status_code = 500, detail="Failed to create/update user")
             
+            # 기존 활성 세션 정리
+            if not settings.allow_multiple_sessions:
+                await AuthService._cleanup_existing_sessions(user.id, redis_client, supabase_client)
+            
             # 4. 새 세션 생성
             session_id = str(uuid.uuid4())
             
@@ -80,13 +80,10 @@ class AuthService:
             encrypted_refresh_token = crypto_handler.encrypt(cognito_tokens['refresh_token'])
             
             # Refresh token 만료 시간 계산 (기본적으로 7일, Cognito 설정에 따라 조정)
-            refresh_expires_at = datetime.utcnow() + timedelta(days=7)
+            refresh_expires_at = datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days)
             
             # 디바이스 정보 수집
-            device_info = {
-                "ip_address": request.client.host if request.client else "unknown",
-                "user_agent": request.headers.get("user-agent", "unknown")
-            }
+            device_info = AuthService._extract_device_info(request)
             
             session_create_data = SessionCreate(
                 user_id = user.id,
@@ -96,19 +93,11 @@ class AuthService:
                 device_info = device_info
             )
             
-            # Supabase에 세션 저장
-            db_session = await supabase_client.create_session(session_create_data)
-            if not db_session:
-                raise HTTPException(status_code=500, detail="Failed to create session")
             
-            # 6. Redis에 세션 캐싱
-            redis_session_data = {
-                "user_id": str(user.id),
-                "refresh_token_enc": encrypted_refresh_token,
-                "refresh_expires_at": refresh_expires_at.isoformat()
-            }
-            ttl_seconds = int((refresh_expires_at - datetime.utcnow()).total_seconds())
-            redis_client.set_session(session_id, redis_session_data, ttl_seconds)
+            # 6. 세션 저장 (DB 및 Redis)
+            await AuthService._create_session(
+                session_create_data, supabase_client, redis_client, refresh_expires_at
+            )
             
             # 7. 내부 JWT 발급
             access_token = jwt_handler.create_access_token(
@@ -119,39 +108,9 @@ class AuthService:
             )
             
             # 8. 쿠키 설정
-            # response.set_cookie(
-            #     key="access_token",
-            #     value=access_token,
-            #     httponly=True,
-            #     secure=True,
-            #     samesite="strict",
-            #     max_age=settings.jwt_access_token_expire_minutes * 60
-            # )
+            AuthService._set_auth_cookies(response, access_token, session_id, refresh_expires_at)
             
-            # response.set_cookie(
-            #     key="session_id",
-            #     value=session_id,
-            #     httponly=True,
-            #     secure=True,
-            #     samesite="strict",
-            #     max_age=ttl_seconds
-            # )
-
-            cookie_config = AuthService._get_cookie_config()
-
-            response.set_cookie(
-                key="access_token",
-                value=access_token,
-                max_age=settings.jwt_access_token_expire_minutes * 60,
-                **cookie_config
-            )
-
-            response.set_cookie(
-                key="session_id",
-                value=session_id,
-                max_age=ttl_seconds,
-                **cookie_config
-            )
+            logger.info(f"User {email} logged in successfully with session {session_id}")
             
             return {
                 "success": True,
@@ -172,18 +131,99 @@ class AuthService:
             raise
         
         except Exception as e:
-            print(f"Login error: {e}")
+            logger.error(f"{email} login error: {e}", exc_info=True)
+            # print(f"Login error: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
+    
+    @staticmethod
+    async def _cleanup_existing_sessions(
+        user_id: uuid.UUID, 
+        redis_client: RedisClient, 
+        supabase_client: SupabaseClient
+    ) -> None:
+        """
+        기존 활성 세션 정리 (단일 세션 정책)
+        """
+        try:
+            existing_session = await supabase_client.get_active_session(user_id)
+            if existing_session:
+                redis_client.delete_session(existing_session.session_id)
+                await supabase_client.revoke_session(existing_session.session_id)
+                logger.info(f"{user_id}'s existing sessions ({existing_session.session_id}) have been cleared")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup existing sessions for user {user_id}: {e}")
+    
+    @staticmethod
+    def _extract_device_info(request: Request) -> Dict[str, str]:
+        """
+        요청에서 디바이스 정보 추출
+        """
+        return {
+            "ip_address": getattr(request.client, 'host', 'unknown') if request.client else "unknown",
+            "user_agent": request.headers.get("user-agent", "unknown")
+        }
+    
+    @staticmethod
+    async def _create_session(
+        session_data: SessionCreate,
+        supabase_client: SupabaseClient,
+        redis_client: RedisClient,
+        refresh_expires_at: datetime
+    ) -> None:
+        """
+        세션 생성 (DB + Redis)
+        """
+        # supabase에 세션 저장
+        db_session = await supabase_client.create_session(session_data)
+        if not db_session:
+            raise HTTPExeption(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create session"
+            )
+        
+        # Redis에 세션 캐싱
+        redis_session_data = {
+            "user_id": str(session_data.user_id),
+            "refresh_token_enc": session_data.refresh_token_enc,
+            "refresh_expires_at": refresh_expires_at.isoformat()
+        }
+        ttl_seconds = int((refresh_expires_at - datetime.utcnow()).total_seconds())
+        
+        if not redis_client.set_session(session_data.session_id, redis_session_data, ttl_seconds):
+            logger.warning(f"Failed to cache session {session_data.session_id} in Redis")
+    
+    @staticmethod
+    def _set_auth_cookies(
+        response: Response, 
+        access_token: str, 
+        session_id: str, 
+        refresh_expires_at: datetime
+    ) -> None:
+        """
+        인증 쿠키 설정
+        """
+        cookie_config = AuthService._get_cookie_config()
+        ttl_seconds = int((refresh_expires_at - datetime.utcnow()).total_seconds())
+    
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            max_age=settings.jwt_access_token_expire_minutes * 60,
+            **cookie_config
+        )
+
+        response.set_cookie(
+            key="session_id",
+            value=session_id,
+            max_age=ttl_seconds,
+            **cookie_config
+        )
+    
     
     @staticmethod
     async def refresh_tokens(
         session_id: str, 
         response: Response,
-        # redis_client: RedisClient = Depends(get_redis_client),
-        # supabase_client: SupabaseClient = Depends(get_supabase_client),
-        # crypto_handler: CryptoHandler = Depends(get_crypto_handler),
-        # cognito_client: CognitoClient = Depends(get_cognito_client),
-        # jwt_handler: JWTHandler = Depends(get_jwt_handler)
         redis_client: RedisClient,
         supabase_client: SupabaseClient,
         crypto_handler: CryptoHandler,
@@ -195,79 +235,43 @@ class AuthService:
         """
         try:
             # 1. Redis에서 세션 조회
-            session_data = redis_client.get_session(session_id)
+            session_data = await AuthService._get_session_data(
+                session_id, redis_client, supabase_client
+            )
             
             if not session_data:
-                # 2. Redis에 없으면 Supabase 조회
-                db_session = await supabase_client.get_session(session_id)
-                if not db_session or db_session.revoked:
-                    return False
+                logger.warning(f"Session {session_id} not found")
+                return False
 
-                session_data = {
-                    "user_id": str(db_session.user_id),
-                    "refresh_token_enc": db_session.refresh_token_enc,
-                    "refresh_expires_at": db_session.refresh_expires_at.isoformat()
-                }
+            # 2. 세션 만료 확인
+            refresh_expires_at = datetime.fromisoformat(session_data["refresh_expires_at"])
+            if refresh_expires_at <= datetime.utcnow():
+                logger.warning(f"Session {session_id} has expired")
+                await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
+                return False
                 
-            # 3. Refresh token 복호화
-            encrypted_refresh_token = session_data["refresh_token_enc"]
-            refresh_token = crypto_handler.decrypt(encrypted_refresh_token)
+            # 3. Refresh token 복호화 및 갱신
+            refresh_token = crypto_handler.decrypt(session_data["refresh_token_enc"])
+            new_tokens = await cognito_client.refresh_token(refresh_token)
             
-            # 4. Cognito에 토큰 갱신 요청
-            new_tokens = cognito_client.refresh_token(refresh_token)
             if not new_tokens:
-                # 갱신 실패 시 세션 무효화
-                await AuthService.logout(session_id, response, redis_client, supabase_client)
+                logger.warning(f"Session {session_id} token could not be refreshed")
+                await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
                 return False
             
-            # 5. 새 refresh token이 있으면 rotate (Cognito 설정에 따라 상이)
+            # 4. Refresh token rotation 처리
             if "refresh_token" in new_tokens and new_tokens['refresh_token']:
-                new_encrypted_refresh = crypto_handler.encrypt(new_tokens['refresh_token'])
-                new_expires_at = datetime.utcnow() + timedelta(days=7)
-                
-                # DB 업데이트
-                await supabase_client.update_session_refresh_token(
-                    session_id, new_encrypted_refresh, new_expires_at
+                await AuthService._rotate_refresh_token(
+                    session_id, new_tokens['refresh_token'], crypto_handler, 
+                    supabase_client, redis_client, session_data
                 )
-                
-                # Redis 업데이트
-                session_data["refresh_token_enc"] = new_encrypted_refresh
-                session_data["refresh_expires_at"] = new_expires_at.isoformat()
-                ttl_seconds = int((new_expires_at - datetime.utcnow()).total_seconds())
-                redis_client.set_session(session_id, session_data, ttl_seconds)
-                
-            # 6. 새 access token 발급
-            user_id = session_data["user_id"]
             
-            user = await supabase_client.get_user_by_cognito_sub(user_id)
-            roles = [user.role] if user and user.role else ["user"]
-            
-            access_token = jwt_handler.create_access_token(
-                user_id=user_id,
-                session_id=session_id,
-                roles=roles, 
-                expires_delta = timedelta(minutes=settings.jwt_access_token_expire_minutes)
+            # 5. 새 Access token 발급 및 쿠키 설정
+            await AuthService._issue_new_access_token(
+                session_data, session_id, jwt_handler, response, supabase_client
             )
             
-            # 7. 새 access token 쿠키 설정
-            # response.set_cookie(
-            #     key="access_token",
-            #     value=access_token,
-            #     httponly=True,
-            #     secure=True,
-            #     samesite="strict",
-            #     max_age=settings.jwt_access_token_expire_minutes * 60
-            # )
-
-            cookie_config = AuthService._get_cookie_config()
-
-            response.set_cookie(
-                key="access_token",
-                value=access_token,
-                max_age=settings.jwt_access_token_expire_minutes * 60,
-                **cookie_config
-            )
-            
+            logger.info(f"Session {session_id} token refresh successful")
             return True
         
         except Exception as e:
@@ -275,11 +279,141 @@ class AuthService:
             return False
     
     @staticmethod
+    async def _get_session_data(
+        session_id: str, 
+        redis_client: RedisClient, 
+        supabase_client: SupabaseClient
+    ) -> Optional[Dict[str, Any]]:
+        """
+        세션 데이터 조회 (Redis -> DB 순)
+        """
+        session_data = redis_client.get_session(session_id)
+        
+        if not session_data:
+            # DB에서 조회
+            db_session = await supabase_client.get_session(session_id)
+            if not db_session or db_session.revoked:
+                return None
+            
+            session_data = {
+                "user_id": str(db_session.user_id),
+                "refresh_token_enc": db_session.refresh_token_enc,
+                "refresh_expires_at": db_session.refresh_expires_at.isoformat()
+            }
+            
+            # Redis에 다시 캐싱
+            ttl_seconds = int((db_session.refresh_expires_at - datetime.utcnow()).total_seconds())
+            if ttl_seconds > 0:
+                redis_client.set_session(session_id, session_data, ttl_seconds)
+                logger.debug(f"세션 {session_id}을 Redis에 재캐싱했습니다")
+                
+        return session_data            
+    
+    @staticmethod
+    async def _rotate_refresh_token(
+        session_id: str,
+        new_refresh_token: str,
+        crypto_handler: CryptoHandler,
+        supabase_client: SupabaseClient,
+        redis_client: RedisClient,
+        session_data: Dict[str, Any]
+    ) -> None :
+        """
+        Refresh token rotation 처리
+        """
+        new_encrypted_refresh = crypto_handler.encrypt(new_refresh_token)
+        new_expires_at = datetime.utcnow() + timedelta(
+            days=getattr(settings, 'refresh_token_expire_days', 7)
+        )
+        
+        # DB 업데이트
+        success = await supabase_client.update_session_refresh_token(
+            session_id, new_encrypted_refresh, new_expires_at
+        )
+
+        if not success:
+            logger.error(f"Session {session_id} refresh token DB update failed")
+            return
+        
+        # Redis 업데이트
+        session_data["refresh_token_enc"] = new_encrypted_refresh
+        session_data["refresh_expires_at"] = new_expires_at.isoformat()
+        ttl_seconds = int((new_expires_at - datetime.utcnow()).total_seconds())
+        
+        if not redis_client.set_session(session_id, session_data, ttl_seconds):
+            logger.warning(f"Session {session_id} refresh token Redis update failed")    
+    
+    @staticmethod
+    async def _issue_new_access_token(
+        session_data: Dict[str, Any],
+        session_id: str,
+        jwt_handler: JWTHandler,
+        response: Response,
+        supabase_client: SupabaseClient
+    ) -> None:
+        """
+        새 access token 발급 및 쿠키 설정
+        """
+        user_id = session_data["user_id"]
+        user = await supabase_client.get_user_by_cognito_sub(user_id)
+        
+        if not user:
+            logger.error(f"사용자 {user_id}를 찾을 수 없습니다")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+            
+        roles = [user.role] if user.role else ["user"]
+        
+        access_token = jwt_handler.create_access_token(
+            user_id=user_id,
+            session_id=session_id,
+            roles=roles, 
+            expires_delta=timedelta(minutes=settings.jwt_access_token_expire_minutes)
+        )
+        
+        cookie_config = AuthService._get_cookie_config()
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            max_age=settings.jwt_access_token_expire_minutes * 60,
+            **cookie_config
+        )        
+            
+    async def _invalidate_session(
+        session_id: str,
+        response: Response,
+        redis_client: RedisClient,
+        supabase_client: SupabaseClient
+    ) -> None:
+        """세션 무효화"""
+        try:
+            redis_client.delete_session(session_id)
+            await supabase_client.revoke_session(session_id)
+            AuthService._clear_auth_cookies(response)
+            logger.info(f"Session {session_id} has been invalidated")
+        except Exception as e:
+            logger.error(f"Session {session_id} invalidation error: {e}")    
+    
+    @staticmethod
+    def _clear_auth_cookies(response: Response) -> None:
+        """인증 쿠키 삭제"""
+        cookie_config = AuthService._get_cookie_config()
+        # delete_cookie에서는 httponly 옵션을 지원하지 않으므로 제외
+        delete_config = {k: v for k, v in cookie_config.items() if k != 'httponly'}
+        
+        for cookie_name in ["access_token", "session_id"]:
+            response.delete_cookie(
+                key=cookie_name, 
+                path="/",
+                **delete_config
+            )
+    
+    @staticmethod
     async def logout(
         session_id: str, 
         response: Response,
-        # redis_client: RedisClient = Depends(get_redis_client),
-        # supabase_client: SupabaseClient = Depends(get_supabase_client)
         redis_client: RedisClient,
         supabase_client: SupabaseClient
     ) -> Dict[str, Any]:
@@ -287,42 +421,17 @@ class AuthService:
         로그아웃 처리
         """
         try:
-            # 1. Redis에서 세션 삭제
-            redis_client.delete_session(session_id)
-            
-            # 2. Supabase에서 세션 무효화
-            await supabase_client.revoke_session(session_id)
-            
-            # 3. 쿠키 삭제 (httponly는 delete_cookie에서 지원하지 않으므로 secure와 samesite만 적용)
-            # response.delete_cookie("access_token", path="/")
-            # response.delete_cookie("session_id", path="/")   # path : 쿠키가 유효한 경로
-            
-
-            is_dev = getattr(settings, 'environment', 'dev').lower() in ['dev', 'development', 'local']
-            
-            response.delete_cookie(
-                key="access_token", 
-                path="/",
-                secure=not is_dev,
-                samesite="lax" if is_dev else "strict"
-            )
-            response.delete_cookie(
-                key="session_id", 
-                path="/",
-                secure=not is_dev,
-                samesite="lax" if is_dev else "strict"
-            )
-
-            return {"success": True, "message": "Logout successful"}
+            await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
+            logger.info(f"Session {session_id} has been logged out successfully")
+            return {"success": True, "message": "logout successful"}
         
         except Exception as e:
-            print(f"Logout Error: {e}")
-            return {"success": False, "message": "Logout failed"}
+            logger.error(f"Session {session_id} logout error: {e}", exc_info=True)
+            return {"success": False, "message": "logout failed"}
 
     @staticmethod
     async def get_current_user_info(
         user_payload: Dict[str, Any],
-        # supabase_client: SupabaseClient = Depends(get_supabase_client)
         supabase_client: SupabaseClient
     ) -> Dict[str, Any]:
         """
@@ -331,10 +440,18 @@ class AuthService:
         try:
             user_id = user_payload["sub"]
             
-            # Supabase에서 사용자 정보 조회
+            if not user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="유효하지 않은 사용자 토큰입니다"
+                )
+            
             user = await supabase_client.get_user_by_cognito_sub(user_id)
             if not user:
-                raise HTTPException(status_code=404, detail="User not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, 
+                    detail="사용자를 찾을 수 없습니다"
+                )
             
             return {
                 "id": str(user.id),
@@ -345,6 +462,11 @@ class AuthService:
                 "is_active": user.is_active
             }
         
+        except HTTPException:
+            raise
         except Exception as e:
-            print(f"Get user info error: {e}")
-            raise HTTPException(status_code=500, detail="Failed to get user info")
+            logger.error(f"User {user_payload.get('sub')} data retrieval error: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+                detail="Failed to retrieve user information"
+            )
