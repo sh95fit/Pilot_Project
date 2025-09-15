@@ -28,6 +28,9 @@ class Settings:
     LOGIN_PAGE_TITLE: str = "로그인"
     DASHBOARD_PAGE_TITLE: str = "대시보드"
 
+    # JWT 만료 기간
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 15
+
     # API 엔드포인트
     @property
     def LOGIN_ENDPOINT(self) -> str:

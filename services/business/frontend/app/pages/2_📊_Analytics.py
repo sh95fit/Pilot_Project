@@ -233,25 +233,38 @@ def render_system_status():
 def render_quick_stats():
     """빠른 통계"""
     st.subheader("⚡ 빠른 통계")
-    
-    # 도넛 차트 - 사용자 역할 분포
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
-        # 사용자 역할 분포
         roles_data = pd.DataFrame({
             'Role': ['관리자', '일반 사용자', '게스트'],
             'Count': [5, 89, 12]
         })
-        
         fig_roles = px.pie(
-            roles_data, 
-            values='Count', 
+            roles_data,
+            values='Count',
             names='Role',
             title='사용자 역할 분포',
             color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c']
         )
         fig_roles.update_traces(textposition='inside', textinfo='percent+label')
+        st.plotly_chart(fig_roles, use_container_width=True)
+
+    with col2:
+        months_data = pd.DataFrame({
+            'Month': ['1월', '2월', '3월', '4월', '5월', '6월'],
+            'New_Users': [23, 31, 28, 45, 38, 52]
+        })
+        fig_monthly = px.bar(
+            months_data,
+            x='Month',
+            y='New_Users',
+            title='월별 신규 가입자',
+            color='New_Users',
+            color_continuous_scale='Blues'
+        )
+        fig_monthly.update_layout(showlegend=False)
         st.plotly_chart(fig_monthly, use_container_width=True)
 
 
@@ -323,22 +336,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()(fig_roles, use_container_width=True)
+    main()
     
-    with col2:
-        # 월별 가입자 추이
-        months_data = pd.DataFrame({
-            'Month': ['1월', '2월', '3월', '4월', '5월', '6월'],
-            'New_Users': [23, 31, 28, 45, 38, 52]
-        })
-        
-        fig_monthly = px.bar(
-            months_data,
-            x='Month',
-            y='New_Users',
-            title='월별 신규 가입자',
-            color='New_Users',
-            color_continuous_scale='Blues'
-        )
-        fig_monthly.update_layout(showlegend=False)
-        st.plotly_chart

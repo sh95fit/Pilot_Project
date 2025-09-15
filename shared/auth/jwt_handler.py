@@ -3,6 +3,9 @@ from typing import Optional, Dict, Any
 import jwt
 from jwt import PyJWTError
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 class JWTHandler:
     def __init__(
@@ -10,12 +13,14 @@ class JWTHandler:
         private_key: str,
         public_key: str,
         algorithm: str = "RS256",
-        issuer: str = "business-auth-api"
+        issuer: str = "business-auth-api",
+        audience: str = "business-auth-client"
     ):
         self.private_key = private_key
         self.public_key = public_key
         self.algorithm = algorithm
         self.issuer = issuer
+        self.audience = audience
     
     def create_access_token(
         self,
@@ -28,23 +33,27 @@ class JWTHandler:
         """
         Access Token 생성
         """
-        if expires_delta:
-            expire = datetime.utcnow() + expires_delta
-        else:
-            expire = datetime.utcnow() + timedelta(minutes=jwt_access_token_expire_minutes)
-        
-        payload = {
-            "iss": self.issuer,
-            "sub": user_id,
-            "aud": "business-auth-client",
-            "exp": expire,
-            "iat": datetime.utcnow(),
-            "jti": session_id,
-            "roles": roles or ["user"],
-            "token_type": "access"
-        }
-        
-        return jwt.encode(payload, self.private_key, algorithm=self.algorithm)
+        try:
+            if expires_delta:
+                expire = datetime.utcnow() + expires_delta
+            else:
+                expire = datetime.utcnow() + timedelta(minutes=jwt_access_token_expire_minutes)
+            
+            payload = {
+                "iss": self.issuer,
+                "sub": user_id,
+                "aud": self.audience,
+                "exp": expire,
+                "iat": datetime.utcnow(),
+                "jti": session_id,
+                "roles": roles or ["user"],
+                "token_type": "access"
+            }
+            
+            return jwt.encode(payload, self.private_key, algorithm=self.algorithm)
+        except Exception as e:
+            logger.error(f"Token creation failed: {e}")
+            raise ValueError(f"Failed to create access token: {e}")
     
     def verify_token(self, token: str) -> Dict[str, Any]:
         """
@@ -55,13 +64,13 @@ class JWTHandler:
                 token,
                 self.public_key,
                 algorithms=[self.algorithm],
-                audience="business-auth-client",
+                audience=self.audience,
                 issuer=self.issuer
             )
             return payload
         except jwt.ExpiredSignatureError:
             raise ValueError("Token has expired")
-        except jwt.InvalidTokenError as e :
+        except jwt.InvalidTokenError as e:
             raise ValueError(f"Invalid token: {e}")
     
     def decode_token_without_verification(self, token: str) -> Dict[str, Any]:

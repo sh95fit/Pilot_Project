@@ -6,6 +6,7 @@ services:
     image: redis:7-alpine
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-dev}
+      - TZ=Asia/Seoul
     container_name: business_redis
     restart: unless-stopped
     networks:
@@ -29,6 +30,7 @@ services:
     container_name: business_backend
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-dev}
+      - TZ=Asia/Seoul
     restart: unless-stopped
     networks:
       - business_network
@@ -53,6 +55,7 @@ services:
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-dev}
       - BACKEND_URL=http://backend:8000
+      - TZ=Asia/Seoul
     restart: unless-stopped
     networks:
       - business_network
