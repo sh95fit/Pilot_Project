@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     cookie_samesite: str = "strict"
     
     
+    # 단일 세션 정책 적용 여부
+    allow_multiple_sessions: bool = False
+    max_sessions_per_user: int = 3
+    
     # RSA 키
 
     # Private/Public Key 읽기
