@@ -136,20 +136,38 @@ class AuthService:
             raise HTTPException(status_code=500, detail="Internal server error")
     
     @staticmethod
+    @staticmethod
     async def _cleanup_existing_sessions(
         user_id: uuid.UUID, 
         redis_client: RedisClient, 
         supabase_client: SupabaseClient
     ) -> None:
-        """
-        기존 활성 세션 정리 (단일 세션 정책)
-        """
+        """세션 정리 - 최대 세션 수 정책에 따라 처리"""
         try:
-            existing_session = await supabase_client.get_active_session(user_id)
-            if existing_session:
-                redis_client.delete_session(existing_session.session_id)
-                await supabase_client.revoke_session(existing_session.session_id)
-                logger.info(f"{user_id}'s existing sessions ({existing_session.session_id}) have been cleared")
+            if not settings.allow_multiple_sessions:
+                # 단일 세션 정책: 모든 기존 세션 삭제
+                existing_sessions = await supabase_client.get_user_sessions(user_id, active_only=True)
+                for session in existing_sessions:
+                    redis_client.delete_session(session.session_id)
+                    await supabase_client.delete_session_permanently(session.session_id)
+                
+                logger.info(f"User {user_id}: deleted {len(existing_sessions)} existing sessions (single session policy)")
+            
+            else:
+                # 다중 세션 허용: 최대 세션 수 체크
+                max_sessions = getattr(settings, 'max_sessions_per_user', 3)
+                existing_sessions = await supabase_client.get_user_sessions(user_id, active_only=True)
+                
+                if len(existing_sessions) >= max_sessions:
+                    # 세션 수가 최대치에 도달했으면 오래된 세션부터 삭제
+                    sessions_to_delete = sorted(existing_sessions, key=lambda x: x.created_at)[:-max_sessions+1]
+                    
+                    for session in sessions_to_delete:
+                        redis_client.delete_session(session.session_id)
+                        await supabase_client.delete_session_permanently(session.session_id)
+                    
+                    logger.info(f"User {user_id}: deleted {len(sessions_to_delete)} old sessions (max sessions: {max_sessions})")
+                
         except Exception as e:
             logger.warning(f"Failed to cleanup existing sessions for user {user_id}: {e}")
     
@@ -231,7 +249,11 @@ class AuthService:
         jwt_handler: JWTHandler
     ) -> bool:
         """
-        토큰 갱신
+        토큰 갱신 - Streamlit 지원을 위해 새 토큰을 반환값으로도 제공
+        
+        Returns:
+            (success: bool, tokens: Optional[Dict])
+            tokens contains: {"access_token": str, "session_id": str, "expires_in": int}
         """
         try:
             # 1. Redis에서 세션 조회
@@ -267,16 +289,23 @@ class AuthService:
                 )
             
             # 5. 새 Access token 발급 및 쿠키 설정
-            await AuthService._issue_new_access_token(
+            new_access_token = await AuthService._issue_new_access_token(
                 session_data, session_id, jwt_handler, response, supabase_client
             )
             
+            # Streamlit 환경을 위한 토큰 정보 반환
+            token_info = {
+                "access_token": new_access_token,
+                "session_id": session_id,
+                "expires_in": settings.jwt_access_token_expire_minutes * 60
+            }
+            
             logger.info(f"Session {session_id} token refresh successful")
-            return True
+            return True, token_info
         
         except Exception as e:
             print(f"Token refresh error: {e}")
-            return False
+            return False, None
     
     @staticmethod
     async def _get_session_data(
@@ -353,6 +382,9 @@ class AuthService:
     ) -> None:
         """
         새 access token 발급 및 쿠키 설정
+        
+        Returns:
+            새로 발급된 access_token
         """
         user_id = session_data["user_id"]
         user = await supabase_client.get_user_by_cognito_sub(user_id)
@@ -380,6 +412,8 @@ class AuthService:
             max_age=settings.jwt_access_token_expire_minutes * 60,
             **cookie_config
         )        
+        
+        return access_token
             
     async def _invalidate_session(
         session_id: str,
@@ -470,3 +504,90 @@ class AuthService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
                 detail="Failed to retrieve user information"
             )
+            
+
+    # streamlit 인증 처리를 위한 비즈니스 로직 추가 
+    @staticmethod
+    async def check_auth_with_headers(
+        request: Request,
+        redis_client: RedisClient,
+        supabase_client: SupabaseClient,
+        jwt_handler: JWTHandler
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Streamlit 환경을 위한 헤더 기반 인증 확인
+        Cookie 헤더에서 토큰을 추출하여 인증 확인
+        """
+        try:
+            # Cookie 헤더에서 토큰 추출
+            cookie_header = request.headers.get("cookie", "")
+            
+            access_token = None
+            session_id = None
+            
+            # 쿠키 파싱
+            if cookie_header:
+                cookies = {}
+                for item in cookie_header.split(';'):
+                    if '=' in item:
+                        key, value = item.strip().split('=', 1)
+                        cookies[key] = value
+                
+                access_token = cookies.get('access_token')
+                session_id = cookies.get('session_id')
+            
+            if not access_token or not session_id:
+                return None
+            
+            # 토큰 검증
+            try:
+                payload = jwt_handler.verify_token(access_token)
+                token_session_id = payload.get('jti')
+                
+                # 세션 ID 일치 확인
+                if token_session_id != session_id:
+                    logger.warning(f"Session ID mismatch: token={token_session_id}, provided={session_id}")
+                    return None
+                
+                # 세션 유효성 확인
+                session_data = await AuthService._get_session_data(
+                    session_id, redis_client, supabase_client
+                )
+                
+                if not session_data:
+                    return None
+                
+                return {
+                    "authenticated": True,
+                    "user_id": payload.get("sub"),
+                    "session_id": session_id,
+                    "roles": payload.get("roles", ["user"])
+                }
+                
+            except ValueError as e:
+                logger.warning(f"Token validation failed: {e}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Header-based auth check error: {e}")
+            return None
+        
+    @staticmethod
+    async def logout_with_tokens(
+        access_token: str,
+        session_id: str,
+        response: Response,
+        redis_client: RedisClient,
+        supabase_client: SupabaseClient
+    ) -> Dict[str, Any]:
+        """
+        Streamlit 환경을 위한 토큰 기반 로그아웃
+        """
+        try:
+            await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
+            logger.info(f"Session {session_id} has been logged out successfully")
+            return {"success": True, "message": "logout successful"}
+        
+        except Exception as e:
+            logger.error(f"Session {session_id} logout error: {e}", exc_info=True)
+            return {"success": False, "message": "logout failed"}
