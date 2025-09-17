@@ -28,6 +28,9 @@ def main():
         "⚙️ 운영 대시보드": show_operations_dashboard
     }    
 
+    if "user_info" not in st.session_state:
+        st.session_state.user_info = None
+
     # 인증 상태 확인
     auth_manager = AuthManager()
     is_authenticated, user_info = auth_manager.check_authentication()
@@ -36,6 +39,8 @@ def main():
         # 로그인 페이지 전용 뷰
         show_login_page()
     else:
+        st.session_state.user_info = user_info
+        
         # 사이드바는 사용자 정보 + 로그아웃만 렌더링
         selected_page = render_sidebar(user_info, pages)
 

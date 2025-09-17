@@ -14,9 +14,6 @@ def render_sidebar(user_info: dict = None, pages: dict = None):
             label_visibility="collapsed"
         )
 
-        # 중간 spacer
-        st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
-
         # 하단 영역: 사용자 정보 + 로그아웃
         if user_info:
             st.markdown("### 👤 사용자 정보")
