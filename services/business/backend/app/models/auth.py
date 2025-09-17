@@ -14,9 +14,18 @@ class LoginResponse(BaseModel):
     tokens: Optional[Dict[str, str]] = None
 
 
+class TokenInfo(BaseModel):
+    """토큰 정보"""
+    access_token: str
+    session_id: str
+    expires_in: int
+
+
 class TokenRefreshResponse(BaseModel):
+    """토큰 갱신 응답"""
     success: bool
     message: str
+    tokens: Optional[TokenInfo] = None  # Streamlit 환경용 토큰 정보
 
 
 class LogoutResponse(BaseModel):

@@ -74,9 +74,24 @@ async def logout(
     supabase_client: SupabaseClient = Depends(get_supabase_client)
 ) -> LogoutResponse:
     """
-    사용자 로그아웃
+    사용자 로그아웃 - 쿠키와 헤더 모두 지원
     """
+    
+    # 1. 쿠키에서 session_id 시도
     session_id = request.cookies.get("session_id")
+    access_token = request.cookies.get("access_token")
+
+    # 2. 쿠키가 없으면 헤더에서 시도 (Streamlit 환경 대응)
+    if not session_id:
+        cookie_header = request.headers.get("cookie", "")
+        if cookie_header:
+            cookies = {}
+            for item in cookie_header.split(';'):
+                if '=' in item:
+                    key, value = item.strip().split('=', 1)
+                    cookies[key] = value
+            session_id = cookies.get('session_id')
+            access_token = cookies.get('access_token')
     
     if not session_id:
         raise HTTPException(
@@ -85,12 +100,23 @@ async def logout(
         )
         
     try:
-        result = await AuthService.logout(
-            session_id=session_id,
-            response=response,
-            redis_client=redis_client,
-            supabase_client=supabase_client
-        )
+        # Streamlit 환경을 위한 토큰 기반 로그아웃도 지원
+        if access_token and session_id:
+            result = await AuthService.logout_with_tokens(
+                access_token=access_token,
+                session_id=session_id,
+                response=response,
+                redis_client=redis_client,
+                supabase_client=supabase_client
+            )
+        else:
+            # 기존 방식 (쿠키만 있는 경우)
+            result = await AuthService.logout(
+                session_id=session_id,
+                response=response,
+                redis_client=redis_client,
+                supabase_client=supabase_client
+            )
         
         return LogoutResponse(**result)
     
@@ -112,9 +138,22 @@ async def refresh(
     jwt_handler: JWTHandler = Depends(get_jwt_handler)
 ) -> TokenRefreshResponse:
     """
-    토큰 갱신
+    토큰 갱신 - 쿠키와 헤더 모두 지원 (Streamlit 헤더 처리를 위한 추가)
     """
+    
+    # 1. 쿠키에서 session_id 시도
     session_id = request.cookies.get("session_id")
+    
+    # 2. 쿠키가 없으면 헤더에서 시도 (Streamlit 환경 대응)
+    if not session_id:
+        cookie_header = request.headers.get("cookie", "")
+        if cookie_header:
+            cookies = {}
+            for item in cookie_header.split(';'):
+                if '=' in item:
+                    key, value = item.strip().split('=', 1)
+                    cookies[key] = value
+            session_id = cookies.get('session_id')
     
     if not session_id:
         raise HTTPException(
@@ -123,7 +162,7 @@ async def refresh(
         )
     
     try:
-        success = await AuthService.refresh_tokens(
+        success, token_info = await AuthService.refresh_tokens(
             session_id=session_id,
             response=response,
             redis_client=redis_client,
@@ -134,10 +173,17 @@ async def refresh(
         )
         
         if success:
-            return TokenRefreshResponse(
-                success=True, 
-                message="Tokens refreshed successfully"
-            )
+            # 기본 응답
+            refresh_response = {
+                "success": True,
+                "message": "Tokens refreshed successfully"
+            }
+            
+            # Streamlit 환경을 위한 토큰 정보 추가
+            if token_info:
+                refresh_response["tokens"] = token_info
+            
+            return TokenRefreshResponse(**refresh_response)
         else:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -177,28 +223,44 @@ async def get_current_user(
         )
 
 @router.get("/check")
-async def check_auth(request: Request) -> Dict[str, Any]:
+async def check_auth(
+    request: Request,
+    jwt_handler: JWTHandler = Depends(get_jwt_handler),
+    redis_client: RedisClient = Depends(get_redis_client),
+    supabase_client: SupabaseClient = Depends(get_supabase_client)
+) -> Dict[str, Any]:
     """
-    인증 상태 확인
+    인증 상태 확인 - 쿠키와 헤더 모두 지원
     """
     try:
-        # 의존성을 수동으로 가져와서 예외 상황도 정상 응답으로 처리
-        jwt_handler = get_jwt_handler()
-        redis_client = get_redis_client()
-        supabase_client = get_supabase_client()
-
-        user = await get_current_user_from_cookie(
-            request,
-            jwt_handler=jwt_handler,
-            redis_client=redis_client,
-            supabase_client=supabase_client,
+        # 1. 기존 쿠키 방식 시도
+        try:
+            user = await get_current_user_from_cookie(
+                request,
+                jwt_handler=jwt_handler,
+                redis_client=redis_client,
+                supabase_client=supabase_client,
+            )
+            
+            return {
+                "authenticated": True, 
+                "user_id": user.get("sub"),
+                "session_id": user.get("session_id"),
+                "roles": user.get("roles", ["user"])
+            }
+        except HTTPException:
+            pass  # 쿠키 방식 실패시 헤더 방식 시도
+    
+        # 2. Streamlit 환경을 위한 헤더 방식 시도
+        auth_result = await AuthService.check_auth_with_headers(
+            request, redis_client, supabase_client, jwt_handler
         )
-
-        return {
-            "authenticated": True, 
-            "user_id": user.get("sub"),
-            "session_id": user.get("session_id")
-        }
+        
+        if auth_result:
+            return auth_result
+        else:
+            return {"authenticated": False, "error": "Invalid or expired token"}    
+    
         
     except HTTPException:
         return {"authenticated": False, "error": "Invalid or expired token"}
@@ -208,13 +270,42 @@ async def check_auth(request: Request) -> Dict[str, Any]:
 
 @router.post("/revoke-all-sessions")
 async def revoke_all_sessions(
-    current_user: Dict[str, Any] = Depends(get_current_user_from_cookie),
+    request: Request,
+    response: Response,
     supabase_client: SupabaseClient = Depends(get_supabase_client),
     redis_client: RedisClient = Depends(get_redis_client),
-    response: Response = None
+    jwt_handler: JWTHandler = Depends(get_jwt_handler)
 ) -> Dict[str, Any]:
-    """현재 사용자의 모든 세션 무효화"""
+    """
+    현재 사용자의 모든 세션 무효화 - 쿠키와 헤더 모두 지원
+    """
     try:
+        # 현재 사용자 정보 가져오기 (쿠키 또는 헤더에서)
+        current_user = None
+        
+        try:
+            # 1. 쿠키 방식 시도
+            current_user = await get_current_user_from_cookie(
+                request, jwt_handler, redis_client, supabase_client
+            )
+        except HTTPException:
+            # 2. 헤더 방식 시도
+            auth_result = await AuthService.check_auth_with_headers(
+                request, redis_client, supabase_client, jwt_handler
+            )
+            if auth_result and auth_result.get("authenticated"):
+                current_user = {
+                    "sub": auth_result.get("user_id"),
+                    "session_id": auth_result.get("session_id"),
+                    "roles": auth_result.get("roles", ["user"])
+                }
+        
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required"
+            )
+        
         user_id = current_user.get("sub")
         if not user_id:
             raise HTTPException(
@@ -227,8 +318,7 @@ async def revoke_all_sessions(
         
         if success:
             # 현재 세션 쿠키도 삭제
-            if response:
-                AuthService._clear_auth_cookies(response)
+            AuthService._clear_auth_cookies(response)
             
             return {"success": True, "message": "All sessions revoked successfully"}
         else:
@@ -242,3 +332,134 @@ async def revoke_all_sessions(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to revoke sessions"
         )
+        
+        
+        
+
+# Streamlit 전용 엔드포인트 예시
+
+class StreamlitTokenRefreshRequest(BaseModel):
+    """Streamlit 환경을 위한 토큰 갱신 요청"""
+    access_token: str
+    session_id: str
+
+
+class StreamlitLogoutRequest(BaseModel):
+    """Streamlit 환경을 위한 로그아웃 요청"""
+    access_token: str
+    session_id: str
+    
+@router.post("/streamlit/refresh", response_model=TokenRefreshResponse)
+async def streamlit_refresh(
+    token_data: StreamlitTokenRefreshRequest,
+    response: Response,
+    redis_client: RedisClient = Depends(get_redis_client),
+    supabase_client: SupabaseClient = Depends(get_supabase_client),
+    crypto_handler: CryptoHandler = Depends(get_crypto_handler),
+    cognito_client: CognitoClient = Depends(get_cognito_client),
+    jwt_handler: JWTHandler = Depends(get_jwt_handler)
+) -> TokenRefreshResponse:
+    """Streamlit 전용 토큰 갱신 (JSON body로 토큰 전달)"""
+    try:
+        success, token_info = await AuthService.refresh_tokens(
+            session_id=token_data.session_id,
+            response=response,
+            redis_client=redis_client,
+            supabase_client=supabase_client,
+            crypto_handler=crypto_handler,
+            cognito_client=cognito_client,
+            jwt_handler=jwt_handler
+        )
+        
+        if success:
+            refresh_response = {
+                "success": True,
+                "message": "Tokens refreshed successfully"
+            }
+            
+            if token_info:
+                refresh_response["tokens"] = token_info
+            
+            return TokenRefreshResponse(**refresh_response)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Failed to refresh tokens"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Streamlit token refresh error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Token refresh failed"
+        )
+
+
+@router.post("/streamlit/logout")
+async def streamlit_logout(
+    token_data: StreamlitLogoutRequest,
+    response: Response,
+    redis_client: RedisClient = Depends(get_redis_client),
+    supabase_client: SupabaseClient = Depends(get_supabase_client)
+) -> LogoutResponse:
+    """Streamlit 전용 로그아웃 (JSON body로 토큰 전달)"""
+    try:
+        result = await AuthService.logout_with_tokens(
+            access_token=token_data.access_token,
+            session_id=token_data.session_id,
+            response=response,
+            redis_client=redis_client,
+            supabase_client=supabase_client
+        )
+        
+        return LogoutResponse(**result)
+    
+    except Exception as e:
+        logger.error(f"Streamlit logout error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Logout failed"
+        )
+
+
+@router.post("/streamlit/check")
+async def streamlit_check_auth(
+    token_data: StreamlitTokenRefreshRequest,  # access_token, session_id 필요
+    jwt_handler: JWTHandler = Depends(get_jwt_handler),
+    redis_client: RedisClient = Depends(get_redis_client),
+    supabase_client: SupabaseClient = Depends(get_supabase_client)
+) -> Dict[str, Any]:
+    """Streamlit 전용 인증 확인 (JSON body로 토큰 전달)"""
+    try:
+        # 토큰 검증
+        try:
+            payload = jwt_handler.verify_token(token_data.access_token)
+            token_session_id = payload.get('jti')
+            
+            # 세션 ID 일치 확인
+            if token_session_id != token_data.session_id:
+                return {"authenticated": False, "error": "Session ID mismatch"}
+            
+            # 세션 유효성 확인
+            session_data = await AuthService._get_session_data(
+                token_data.session_id, redis_client, supabase_client
+            )
+            
+            if not session_data:
+                return {"authenticated": False, "error": "Invalid session"}
+            
+            return {
+                "authenticated": True,
+                "user_id": payload.get("sub"),
+                "session_id": token_data.session_id,
+                "roles": payload.get("roles", ["user"])
+            }
+            
+        except ValueError as e:
+            return {"authenticated": False, "error": f"Token validation failed: {str(e)}"}
+            
+    except Exception as e:
+        logger.error(f"Streamlit auth check error: {e}")
+        return {"authenticated": False, "error": "Authentication check failed"}

@@ -228,3 +228,12 @@ class SupabaseClient:
         except Exception as e:
             logger.error(f"Error fetching user sessions for {user_id}: {e}")
             return []
+        
+    async def delete_session_permanently(self, session_id: str) -> bool:
+        """세션 물리적 삭제"""
+        try:
+            response = self.client.table("user_sessions").delete().eq("session_id", session_id).execute()
+            return len(response.data) > 0
+        except Exception as e:
+            logger.error(f"Error permanently deleting session {session_id}: {e}")
+            return False
