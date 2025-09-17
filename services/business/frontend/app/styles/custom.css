@@ -41,7 +41,7 @@
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
-/* 로그인 폼 스타일 */
+/* 로그인 폼 스타일 - 제목 크기 조정 */
 .login-container {
     max-width: 400px;
     margin: 2rem auto;
@@ -49,6 +49,71 @@
     background: white;
     border-radius: 15px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.login-container h1 {
+    font-size: 1.8rem !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem;
+}
+
+.login-container h2 {
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem;
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #1f2937;
+}
+
+.login-header h2 {
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+    margin: 0;
+}
+
+/* 로딩 화면 스타일 */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(2px);
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 로그인 페이지 레이아웃 개선 */
+.login-page {
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    margin: -1rem -1rem 0 -1rem;
+    padding: 2rem;
 }
 
 /* 차트 컨테이너 */
@@ -94,7 +159,7 @@
     color: #721c24;
 }
 
-/* 애니메이션 */
+/* 페이드 인 애니메이션 */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -110,6 +175,43 @@
     animation: fadeIn 0.5s ease-out;
 }
 
+/* 페이지 전환 애니메이션 */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* SelectBox 스타일 개선 */
+.stSelectbox > div > div > select {
+    border-radius: 8px;
+    border: 2px solid #e5e7eb;
+    padding: 0.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.stSelectbox > div > div > select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 스피너 커스터마이징 */
+.stSpinner > div {
+    border-top-color: #3b82f6 !important;
+    width: 2rem !important;
+    height: 2rem !important;
+}
+
 /* 반응형 디자인 */
 @media (max-width: 768px) {
     .main > div {
@@ -121,8 +223,21 @@
         padding: 1.5rem;
     }
     
+    .login-container h1 {
+        font-size: 1.5rem !important;
+    }
+    
+    .login-container h2 {
+        font-size: 1.3rem !important;
+    }
+    
     .user-card {
         padding: 1rem;
+    }
+    
+    .login-page {
+        padding: 1rem;
+        margin: -0.5rem -0.5rem 0 -0.5rem;
     }
 }
 
@@ -135,6 +250,15 @@
     
     .chart-container {
         background: #2d3748;
+    }
+    
+    .login-container {
+        background: #2d3748;
+        color: white;
+    }
+    
+    .loading-overlay {
+        background: rgba(45, 55, 72, 0.95);
     }
 }
 
@@ -151,6 +275,7 @@
 ::-webkit-scrollbar-thumb {
     background: #888;
     border-radius: 4px;
+    transition: background 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -162,9 +287,48 @@
     background: rgba(31, 119, 180, 0.3);
 }
 
-/* 포커스 스타일 */
+/* 포커스 스타일 통일 */
 .stTextInput > div > div > input:focus,
-.stSelectbox > div > div > select:focus {
-    border-color: #1f77b4 !important;
-    box-shadow: 0 0 0 0.2rem rgba(31, 119, 180, 0.25) !important;
+.stSelectbox > div > div > select:focus,
+.stTextArea > div > div > textarea:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
+    outline: none !important;
+}
+
+/* 사이드바 개선 */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+[data-testid="stSidebar"] .stSelectbox {
+    margin-bottom: 1rem;
+}
+
+/* 로그인 성공/실패 메시지 스타일 */
+.stSuccess {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.stError {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.stWarning {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* 부드러운 호버 효과 */
+.stButton > button,
+.stSelectbox > div > div > select,
+.stTextInput > div > div > input {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 카드 호버 효과 */
+.metric-card:hover,
+.chart-container:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transition: all 0.3s ease;
 }

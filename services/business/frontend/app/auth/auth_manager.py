@@ -162,7 +162,10 @@ class AuthManager:
             auth_result = self.api_client.check_auth(access_token, session_id)
             
             if auth_result and auth_result.get('authenticated'):
-                user_info = st.session_state.get('user_info')
+                # 서버 user_info 없으면 세션 값 유지
+                user_info = auth_result.get('user_info') or st.session_state.get('user_info')
+                if user_info:
+                    st.session_state.user_info = user_info  # 세션 값 항상 최신화
                 logger.debug("Authentication verified by server")
                 return True, user_info
             else:
