@@ -6,7 +6,6 @@ from views.dashboard_management import show_management_dashboard
 from views.dashboard_operations import show_operations_dashboard
 from config.settings import settings
 
-
 def main():
     st.set_page_config(
         page_title=settings.PAGE_TITLE,
@@ -22,12 +21,12 @@ def main():
     #         st.Page(show_operations_dashboard, title="운영 대시보드", icon="⚙️"),
     #     ]
     # }
-    
+        
     pages = {
         "💼 경영 대시보드": show_management_dashboard,
         "⚙️ 운영 대시보드": show_operations_dashboard
-    }    
-
+    }
+        
     if "user_info" not in st.session_state:
         st.session_state.user_info = None
 
@@ -40,7 +39,7 @@ def main():
         show_login_page()
     else:
         st.session_state.user_info = user_info
-        
+                
         # 사이드바는 사용자 정보 + 로그아웃만 렌더링
         selected_page = render_sidebar(user_info, pages)
 
@@ -49,7 +48,7 @@ def main():
         # nav.run()
 
         # 선택된 페이지 실행
-        pages[selected_page]()        
+        pages[selected_page]()
 
 if __name__ == "__main__":
     main()
