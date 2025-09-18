@@ -15,6 +15,9 @@ def render_login_form():
     if st.session_state.get("login_form_rendered", False):
         return
 
+    # 중복 방지를 위해 폼 렌더링 시작 직전에 True로 설정
+    st.session_state["login_form_rendered"] = True
+
     # 페이지 중앙 정렬
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
