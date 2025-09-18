@@ -43,6 +43,7 @@ class Settings:
 
     # FastAPI 백엔드 설정
     BACKEND_URL: str = os.getenv("BACKEND_URL", "http://backend:8000")
+    API_TIMEOUT = int = os.getenv("API_TIMEOUT", 30)
 
     # API 엔드포인트
     @property

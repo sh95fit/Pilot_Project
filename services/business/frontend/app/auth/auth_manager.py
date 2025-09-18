@@ -110,16 +110,16 @@ class AuthManager:
     
     def check_authentication(self) -> Tuple[bool, Optional[Dict[str, Any]]]:
         """
-        인증 상태 확인 및 토큰 갱신 - 개선된 동기화 처리
+        인증 상태 확인 - /auth/me API 활용 (개선된 버전)
         """
         try:
-            # 1. 로그인 성공 직후 상태 확인 (향상된 처리)
+            # 1. 로그인 성공 직후 상태 확인 (기존 로직 유지)
             if st.session_state.get('login_success'):
                 login_time = st.session_state.get('login_timestamp', 0)
                 current_time = time.time()
                 
-                # 로그인 성공 후 10초 이내라면 세션 상태 우선 사용
-                if current_time - login_time < 10:
+                # 로그인 성공 후 5초 이내라면 세션 상태 우선 사용 (단축)
+                if current_time - login_time < 5:
                     user_info = st.session_state.get('user_info')
                     if user_info:
                         logger.debug("Using session state for recent login")
@@ -129,14 +129,16 @@ class AuthManager:
                         
                         return True, user_info
                 else:
-                    # 10초 경과 후에는 login_success 플래그 제거
+                    # 5초 경과 후에는 login_success 플래그 제거
                     self._clear_login_success_flags()
             
-            # 2. 일반적인 토큰 기반 인증 확인
+            # 2. 토큰 기반 인증 확인
             access_token, session_id = self.session_manager.get_auth_tokens()
             
             if not access_token or not session_id:
                 logger.debug("No tokens found")
+                # 🔧 수정: 새로고침 시 불필요한 삭제 방지
+                # 기존처럼 단순히 False 반환 (삭제 로직 제거)
                 return False, None
             
             # 3. 토큰 만료 확인 및 갱신
@@ -147,35 +149,53 @@ class AuthManager:
                     logger.debug("Token refreshed successfully")
                 else:
                     logger.warning("Token refresh failed")
-                    self.session_manager.clear_auth_tokens()
+                    # 실제 토큰 만료/갱신 실패 시에만 삭제
+                    self._clear_auth_state()
                     return False, None
             
-            # 4. 토큰 갱신 임계점 확인
+            # 4. 토큰 갱신 임계점 확인 
             elif self.session_manager.should_refresh_token(
                 access_token, 
                 settings.TOKEN_REFRESH_THRESHOLD_MINUTES
             ):
                 logger.debug("Token needs refresh (threshold reached)")
                 self._refresh_token(access_token, session_id)
-            
-            # 5. 서버에서 인증 상태 최종 확인
+
+            # 5. 서버에서 인증 상태 최종 확인 (기존 유지)
             auth_result = self.api_client.check_auth(access_token, session_id)
             
             if auth_result and auth_result.get('authenticated'):
-                # 서버 user_info 없으면 세션 값 유지
-                user_info = auth_result.get('user_info') or st.session_state.get('user_info')
+                # 인증 성공 시 /auth/me API로 최신 사용자 정보 조회
+                user_info = self._get_current_user_info(access_token)
+                
                 if user_info:
-                    st.session_state.user_info = user_info  # 세션 값 항상 최신화
-                logger.debug("Authentication verified by server")
-                return True, user_info
+                    # 최신 사용자 정보로 업데이트
+                    st.session_state.user_info = user_info
+                    st.session_state.last_auth_check = time.time()
+                    logger.debug(f"Authentication verified with updated user info: {user_info.get('email', 'unknown')}")
+                    return True, user_info
+                else:
+                    # /auth/me 실패 시 check_auth 결과의 user_info나 세션 값 사용
+                    fallback_user_info = auth_result.get('user_info') or st.session_state.get('user_info')
+                    if fallback_user_info:
+                        st.session_state.user_info = fallback_user_info
+                        logger.warning("Using fallback user info due to /auth/me failure")
+                        return True, fallback_user_info
+                    else:
+                        # 사용자 정보 없지만 인증은 성공했으므로 최소 상태만 유지
+                        st.session_state.user_info = {"user_id": auth_result.get("user_id")}
+                        logger.warning("No detailed user info; using minimal auth state")
+                        return True, st.session_state.user_info
             else:
                 logger.warning("Server authentication check failed")
-                self.session_manager.clear_auth_tokens()
+                # 🔧 서버 인증 실패 시에만 삭제
+                self._clear_auth_state()
                 return False, None
                 
         except Exception as e:
             logger.error(f"Authentication check error: {e}")
-            self.session_manager.clear_auth_tokens()
+            # 🔧 예외 발생 시에만 삭제
+            self._clear_auth_state()
             return False, None
     
     def _check_and_update_sync_status(self):
@@ -272,14 +292,99 @@ class AuthManager:
     
     def force_sync_check(self) -> bool:
         """
-        강제로 토큰 동기화 상태 확인 (디버깅/테스트용)
+        동기화 강제 확인
         """
         try:
             access_token, session_id = self.session_manager.get_auth_tokens()
-            if access_token and session_id:
-                return self.session_manager.wait_for_token_sync(access_token, session_id, max_wait_seconds=2)
-            return False
+            
+            if not access_token or not session_id:
+                return False
+            
+            # 서버 인증 상태 확인
+            auth_result = self.api_client.check_auth(access_token, session_id)
+            
+            if auth_result and auth_result.get('authenticated'):
+                # /auth/me를 통한 사용자 정보 추가 확인
+                user_info = self._get_current_user_info(access_token)
+                if user_info:
+                    st.session_state.user_info = user_info
+                
+                logger.info("Force sync check successful")
+                return True
+            else:
+                logger.warning("Force sync check failed")
+                return False
+                
         except Exception as e:
             logger.error(f"Force sync check error: {e}")
             return False
+
+    def _get_current_user_info(self, access_token: str) -> Optional[Dict[str, Any]]:
+        """
+        /auth/me API를 통한 현재 사용자 정보 조회
+        """
+        try:
+            # API 호출
+            response = self.api_client.get_current_user(access_token)
+            
+            if response and response.get('success'):
+                user_info = response.get('user_info', {})
+                
+                # 필수 필드 검증
+                if user_info.get('email'):
+                    logger.debug(f"Successfully retrieved user info for: {user_info['email']}")
+                    return user_info
+                else:
+                    logger.warning("User info missing required fields")
+                    return None
+            else:
+                error_msg = response.get('message', 'Unknown error') if response else 'No response'
+                logger.warning(f"/auth/me API failed: {error_msg}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting current user info: {e}")
+            return None
+
+    def force_refresh_user_info(self) -> bool:
+        """
+        사용자 정보 강제 새로고침
+        """
+        try:
+            access_token, _ = self.session_manager.get_auth_tokens()
+            
+            if not access_token:
+                return False
+            
+            user_info = self._get_current_user_info(access_token)
+            
+            if user_info:
+                st.session_state.user_info = user_info
+                logger.info("User info force refreshed successfully")
+                return True
+            else:
+                logger.warning("Failed to force refresh user info")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Force refresh user info error: {e}")
+            return False
         
+    def _clear_auth_state(self):
+        """
+        인증 상태 완전 초기화
+        """
+        # 토큰 정리
+        self.session_manager.clear_auth_tokens()
+        
+        # 세션 상태 정리
+        auth_keys = [
+            'user_info', 'login_success', 'login_timestamp', 
+            'is_authenticated', 'auth_checked', 'last_auth_check'
+        ]
+        
+        for key in auth_keys:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        logger.debug("Auth state cleared")        

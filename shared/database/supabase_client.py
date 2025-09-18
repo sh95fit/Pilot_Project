@@ -43,6 +43,19 @@ class SupabaseClient:
             logger.error(f"Error fetching user by cognito_sub {cognito_sub}: {e}")
             return None
         
+    async def get_user_by_id(self, user_id: str) -> Optional[User]:
+        """
+        사용자 ID로 사용자 조회
+        """
+        try:
+            response = self.client.table("users").select("*").eq("id", str(user_id)).execute()
+            if response.data:
+                return User(**response.data[0])
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching user by id {user_id}: {e}")
+            return None
+        
     async def create_user(self, user_data: UserCreate) -> Optional[User]:
         """
         새 사용자 생성

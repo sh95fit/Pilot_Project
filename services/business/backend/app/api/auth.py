@@ -199,19 +199,55 @@ async def refresh(
             detail="Token refresh failed"
         )
 
-@router.get("/me", response_model=UserInfoResponse)
+@router.get("/me")
 async def get_current_user(
-    current_user: Dict[str, Any] = Depends(get_current_user_from_cookie),
+    request: Request,
+    jwt_handler: JWTHandler = Depends(get_jwt_handler),
+    redis_client: RedisClient = Depends(get_redis_client),
     supabase_client: SupabaseClient = Depends(get_supabase_client)
-) -> UserInfoResponse:
+) -> Dict[str, Any]:
     """
-    현재 사용자 정보 조회
+    현재 사용자 정보 조회 - 쿠키와 헤더 모두 지원
     """
     try:
+        current_user = None
+        
+        # 1. 쿠키 방식 시도
+        try:
+            current_user = await get_current_user_from_cookie(
+                request, jwt_handler, redis_client, supabase_client
+            )
+        except HTTPException:
+            pass
+        
+        # 2. 쿠키가 없으면 헤더 방식 시도 (Streamlit 환경 대응)
+        if not current_user:
+            auth_result = await AuthService.check_auth_with_headers(
+                request, redis_client, supabase_client, jwt_handler
+            )
+            if auth_result and auth_result.get("authenticated"):
+                current_user = {
+                    "sub": auth_result.get("user_id"),
+                    "session_id": auth_result.get("session_id"),
+                    "roles": auth_result.get("roles", ["user"])
+                }
+        
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required"
+            )
+        
+        # 사용자 정보 조회
         user_info = await AuthService.get_current_user_info(
             current_user, supabase_client
         )
-        return UserInfoResponse(**user_info)
+        
+        # 프론트엔드가 기대하는 구조로 응답
+        return {
+            "success": True,
+            "user_info": user_info
+        }
         
     except HTTPException:
         raise

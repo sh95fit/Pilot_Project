@@ -247,12 +247,12 @@ class AuthService:
         crypto_handler: CryptoHandler,
         cognito_client: CognitoClient,
         jwt_handler: JWTHandler
-    ) -> bool:
+    ) -> Tuple[bool, Optional[Dict]]:
         """
         토큰 갱신 - Streamlit 지원을 위해 새 토큰을 반환값으로도 제공
         
         Returns:
-            (success: bool, tokens: Optional[Dict])
+            Tuple[success: bool, tokens: Optional[Dict]]
             tokens contains: {"access_token": str, "session_id": str, "expires_in": int}
         """
         try:
@@ -387,7 +387,7 @@ class AuthService:
             새로 발급된 access_token
         """
         user_id = session_data["user_id"]
-        user = await supabase_client.get_user_by_cognito_sub(user_id)
+        user = await supabase_client.get_user_by_id(user_id)
         
         if not user:
             logger.error(f"사용자 {user_id}를 찾을 수 없습니다")
@@ -472,7 +472,8 @@ class AuthService:
         현재 사용자 정보 조회
         """
         try:
-            user_id = user_payload["sub"]
+            # JWT payload에서 user_id 우선 사용, 없으면 cognito_sub 사용
+            user_id = user_payload.get("sub")  
             
             if not user_id:
                 raise HTTPException(
@@ -480,7 +481,15 @@ class AuthService:
                     detail="유효하지 않은 사용자 토큰입니다"
                 )
             
-            user = await supabase_client.get_user_by_cognito_sub(user_id)
+            # user_id가 UUID 형식이면 직접 조회, 아니면 cognito_sub로 조회
+            try:
+                # user_id가 UUID 형식인지 확인
+                uuid.UUID(user_id)
+                user = await supabase_client.get_user_by_id(user_id)
+            except Exception as e:
+                logger.error(f"User not found : {e}", exc_info=True)
+                
+            
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND, 
