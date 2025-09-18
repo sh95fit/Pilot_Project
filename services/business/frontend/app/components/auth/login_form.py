@@ -11,12 +11,15 @@ def render_login_form():
     """
     form_key = "main_login_form"
 
+    # 이미 렌더링된 상태면 중복 방지
+    if st.session_state.get("login_form_rendered", False):
+        return
+
     # 페이지 중앙 정렬
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         # 헤더
         st.markdown('<h3 style="text-align:center;">🔐 로그인</h3>', unsafe_allow_html=True)
-        # st.markdown('<p style="color:#6b7280;">계정 정보를 입력해 주세요</p>', unsafe_allow_html=True)
 
         # 로그인 폼
         with st.form(key=form_key):
@@ -39,6 +42,9 @@ def render_login_form():
 
             if submit_button:
                 _handle_login_submission(email, password)
+
+    # 렌더링 완료 표시
+    st.session_state["login_form_rendered"] = True
 
 
 def _handle_login_submission(email: str, password: str):

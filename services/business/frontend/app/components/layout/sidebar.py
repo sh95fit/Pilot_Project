@@ -74,20 +74,20 @@ def _render_user_info(user_info):
                 st.caption(f"🕒 최근 로그인: {last_login}")
             
             # 정보 새로고침 버튼
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🔄 정보 새로고침", key="refresh_user_info", use_container_width=True):
-                    try:
-                        from auth.auth_manager import AuthManager
-                        auth_manager = AuthManager()
-                        if auth_manager.force_refresh_user_info():
-                            st.success("✅ 정보가 업데이트되었습니다")
-                            st.rerun()
-                        else:
-                            st.error("❌ 정보 업데이트에 실패했습니다")
-                    except Exception as e:
-                        st.error("❌ 새로고침 중 오류가 발생했습니다")
-                        logger.error(f"User info refresh error: {e}")
+            st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+
+            if st.button("🔄 정보 새로고침", key="refresh_user_info", use_container_width=True):
+                try:
+                    from auth.auth_manager import AuthManager
+                    auth_manager = AuthManager()
+                    if auth_manager.force_refresh_user_info():
+                        st.success("✅ 정보가 업데이트되었습니다")
+                        st.rerun()
+                    else:
+                        st.error("❌ 정보 업데이트에 실패했습니다")
+                except Exception as e:
+                    st.error("❌ 새로고침 중 오류가 발생했습니다")
+                    logger.error(f"User info refresh error: {e}")
                 
     else:
         # 사용자 정보가 없는 경우

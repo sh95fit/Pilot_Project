@@ -188,13 +188,13 @@ class AuthManager:
                         return True, st.session_state.user_info
             else:
                 logger.warning("Server authentication check failed")
-                # 🔧 서버 인증 실패 시에만 삭제
+                # 서버 인증 실패 시에만 삭제
                 self._clear_auth_state()
                 return False, None
                 
         except Exception as e:
             logger.error(f"Authentication check error: {e}")
-            # 🔧 예외 발생 시에만 삭제
+            # 예외 발생 시에만 삭제
             self._clear_auth_state()
             return False, None
     
