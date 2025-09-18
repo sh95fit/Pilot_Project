@@ -25,10 +25,10 @@ def init_session_state():
 def check_auth_state():
     """
     인증 상태 체크
-    - 최초 로그인 시 로딩 없이 처리
-    - 새로고침 시에도 인증 완료 후 바로 화면 표시
     """
     auth_manager = AuthManager()
+    
+    # 로그인 세션 유지 확인
     is_authenticated, user_info = auth_manager.check_authentication()
 
     st.session_state.is_authenticated = is_authenticated
@@ -60,8 +60,9 @@ def main():
     is_authenticated, user_info = check_auth_state()
 
     if not is_authenticated:
-        # 로그인 폼 초기화 상태
+        # 로그인 폼 상태 초기화
         st.session_state["login_form_rendered"] = False
+        st.session_state["footer_rendered"] = False
         
         # 로그인 페이지 표시 (사이드바 숨김)
         st.markdown("""
