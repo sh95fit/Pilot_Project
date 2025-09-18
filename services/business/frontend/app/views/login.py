@@ -36,16 +36,18 @@ def show_login_page():
     """, unsafe_allow_html=True)
     
     # 로그인 페이지 헤더
-    st.markdown("""
-    <div class="login-content" style="text-align: center; margin-bottom: 2rem;">
-        <h1 style="color: #1f2937; font-size: 1.8rem; font-weight: 600; margin-bottom: 0.5rem;">
-            🏢 Business Dashboard
-        </h1>
-        <p style="color: #6b7280; font-size: 1rem; margin-top: 0.5rem;">
-            관리자 로그인이 필요합니다
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    if not st.session_state.get("login_header_rendered", False):
+        st.markdown("""
+        <div class="login-content" style="text-align: center; margin-bottom: 2rem;">
+            <h1 style="color: #1f2937; font-size: 1.8rem; font-weight: 600; margin-bottom: 0.5rem;">
+                🏢 Business Dashboard
+            </h1>
+            <p style="color: #6b7280; font-size: 1rem; margin-top: 0.5rem;">
+                관리자 로그인이 필요합니다
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.session_state["login_header_rendered"] = True
     
     # 로그인 폼 렌더링
     render_login_form()

@@ -59,7 +59,10 @@ def main():
     # 인증 상태 확인
     is_authenticated, user_info = check_auth_state()
 
-    if not is_authenticated:        
+    if not is_authenticated:
+        # 로그인 폼 상태 초기화
+        st.session_state["login_form_rendered"] = False
+        
         # 로그인 페이지 표시 (사이드바 숨김)
         st.markdown("""
         <style>
