@@ -46,9 +46,6 @@ def render_login_form():
             if submit_button:
                 _handle_login_submission(email, password)
 
-    # 렌더링 완료 표시
-    st.session_state["login_form_rendered"] = True
-
 
 def _handle_login_submission(email: str, password: str):
     if not email or not password:
