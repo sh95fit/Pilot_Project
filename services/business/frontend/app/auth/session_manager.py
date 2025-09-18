@@ -216,15 +216,25 @@ class SessionManager:
             # 2. CookieController에서 삭제 시도
             if self.cookie_controller:
                 try:
-                    self.cookie_controller.remove('access_token')
-                    self.cookie_controller.remove('session_id')
-                    logger.debug("Tokens removed from CookieController")
+                    # 쿠키 존재 여부 먼저 확인
+                    existing_access_token = self.cookie_controller.get('access_token')
+                    existing_session_id = self.cookie_controller.get('session_id')
                     
-                    # 쿠키 삭제 확인을 위한 짧은 대기
-                    self._wait_for_cookie_removal()
+                    if existing_access_token:
+                        self.cookie_controller.remove('access_token')
+                        logger.debug("Access token removed from CookieController")
+                    
+                    if existing_session_id:
+                        self.cookie_controller.remove('session_id')
+                        logger.debug("Session ID removed from CookieController")
+                    
+                    # 실제로 삭제할 쿠키가 있었다면 대기
+                    if existing_access_token or existing_session_id:
+                        self._wait_for_cookie_removal()
                     
                 except Exception as e:
-                    logger.warning(f"CookieController remove failed: {e}")
+                    logger.warning(f"CookieController remove operation failed: {e}")
+                    # 쿠키 삭제 실패해도 세션은 정리되었으므로 계속 진행
             
             return True
             

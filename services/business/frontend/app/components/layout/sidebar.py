@@ -32,7 +32,7 @@ def render_sidebar(user_info, pages):
         _render_logout_section()
         
         # 시스템 정보 (하단)
-        _render_system_info()
+        # _render_system_info()
         
         return selected_page
 
@@ -49,6 +49,7 @@ def _render_user_info(user_info):
             email = user_info.get('email', 'Unknown')
             name = user_info.get('name', user_info.get('username', '사용자'))
             role = user_info.get('role', 'User')
+            last_login = user_info.get('last_login', '')
             
             st.markdown(f"""
             <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border-left: 4px solid #3b82f6;">
@@ -67,17 +68,45 @@ def _render_user_info(user_info):
                 </div>
             </div>
             """, unsafe_allow_html=True)
+        
+            # 최근 로그인 시간 표시
+            if last_login:
+                st.caption(f"🕒 최근 로그인: {last_login}")
             
-            # 로그인 시간 표시 (있다면)
-            if 'login_time' in user_info:
-                login_time = user_info['login_time']
-                st.caption(f"🕒 로그인: {login_time}")
+            # 정보 새로고침 버튼
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🔄 정보 새로고침", key="refresh_user_info", use_container_width=True):
+                    try:
+                        from auth.auth_manager import AuthManager
+                        auth_manager = AuthManager()
+                        if auth_manager.force_refresh_user_info():
+                            st.success("✅ 정보가 업데이트되었습니다")
+                            st.rerun()
+                        else:
+                            st.error("❌ 정보 업데이트에 실패했습니다")
+                    except Exception as e:
+                        st.error("❌ 새로고침 중 오류가 발생했습니다")
+                        logger.error(f"User info refresh error: {e}")
                 
     else:
-        # 사용자 정보가 없는 경우 (비상 상황)
+        # 사용자 정보가 없는 경우
         st.warning("⚠️ 사용자 정보를 불러올 수 없습니다.")
-        if st.button("🔄 정보 새로고침", key="refresh_user_info"):
-            st.rerun()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 정보 새로고침", key="refresh_user_info_fallback", use_container_width=True):
+                st.rerun()
+        with col2:
+            if st.button("🚪 다시 로그인", key="relogin_button", use_container_width=True):
+                try:
+                    from auth.auth_manager import AuthManager
+                    auth_manager = AuthManager()
+                    auth_manager._clear_auth_state()
+                    st.rerun()
+                except Exception as e:
+                    logger.error(f"Relogin error: {e}")
+                    st.rerun()
 
 def _render_navigation_menu(pages):
     """
@@ -109,7 +138,7 @@ def _render_logout_section():
     """
     로그아웃 섹션 렌더링
     """
-    st.markdown("### 🚪 계정 관리")
+    # st.markdown("### 🚪 계정 관리")
     
     # 로그아웃 버튼 (components.auth.login_form에서 가져옴)
     render_logout_button()
@@ -123,26 +152,26 @@ def _render_logout_section():
     #     - 의심스러운 활동이 감지되면 즉시 신고해 주세요
     #     """)
 
-def _render_system_info():
-    """
-    시스템 정보 렌더링 (하단)
-    """
-    st.markdown("---")
+# def _render_system_info():
+#     """
+#     시스템 정보 렌더링 (하단)
+#     """
+#     st.markdown("---")
     
-    # 시스템 상태
-    with st.expander("ℹ️ 시스템 정보", expanded=False):
-        import datetime
-        import platform
+#     # 시스템 상태
+#     with st.expander("ℹ️ 시스템 정보", expanded=False):
+#         import datetime
+#         import platform
         
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        st.markdown(f"""
-        **시스템 상태:**
-        - 🕒 현재 시간: `{current_time}`
-        - 💻 플랫폼: `{platform.system()}`
-        - 🌐 Streamlit 버전: `{st.__version__}`
-        - 📱 세션 상태: `활성화`
-        """)
+#         st.markdown(f"""
+#         **시스템 상태:**
+#         - 🕒 현재 시간: `{current_time}`
+#         - 💻 플랫폼: `{platform.system()}`
+#         - 🌐 Streamlit 버전: `{st.__version__}`
+#         - 📱 세션 상태: `활성화`
+#         """)
         
         # 세션 정보 (개발 환경에서만)
         # if st.secrets.get("environment", "prod") == "dev":
@@ -154,7 +183,7 @@ def _render_system_info():
         #     st.json(session_info)
     
     # 버전 정보
-    st.caption("© 2024 Business Dashboard v1.0")
+    st.caption("© 2025 Business Dashboard v1.0")
 
 def render_mobile_navigation(pages, user_info):
     """

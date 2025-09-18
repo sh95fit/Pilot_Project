@@ -71,6 +71,6 @@ def show_login_page():
     # 푸터
     st.markdown("""
     <div style="text-align: center; margin-top: 3rem; color: #9ca3af;">
-        <small>© 2024 Business Dashboard. All rights reserved.</small>
+        <small>© 2025 Business Dashboard. All rights reserved.</small>
     </div>
     """, unsafe_allow_html=True)

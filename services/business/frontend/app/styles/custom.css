@@ -44,8 +44,8 @@
 /* 로그인 폼 스타일 - 제목 크기 조정 */
 .login-container {
     max-width: 400px;
-    margin: 2rem auto;
-    padding: 2rem;
+    margin: 1rem auto;
+    padding: 1rem;
     background: white;
     border-radius: 15px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.1);
