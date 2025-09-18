@@ -22,7 +22,7 @@ def render_login_form():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         # 헤더
-        # st.markdown('<h3 style="text-align:center;">🔐 로그인</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 style="text-align:center;">🔐 로그인</h3>', unsafe_allow_html=True)
 
         # 로그인 폼
         with st.form(key=form_key):
