@@ -22,7 +22,7 @@ def render_login_form():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         # 헤더
-        st.markdown('<h3 style="text-align:center;">🔐 로그인</h3>', unsafe_allow_html=True)
+        # st.markdown('<h3 style="text-align:center;">🔐 로그인</h3>', unsafe_allow_html=True)
 
         # 로그인 폼
         with st.form(key=form_key):
@@ -70,10 +70,12 @@ def _handle_login_submission(email: str, password: str):
         else:
             st.error(f"❌ {error_message or '이메일 또는 비밀번호가 올바르지 않습니다.'}")
             st.warning("🔒 여러 번 로그인에 실패하면 계정이 일시적으로 잠길 수 있습니다.")
+            st.session_state["login_form_rendered"] = False
             logger.warning(f"Login failed for {email}: {error_message}")
     except Exception as e:
         st.error("❌ 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
         st.info("💬 문제가 지속되면 시스템 관리자에게 문의해주세요.")
+        st.session_state["login_form_rendered"] = False
         logger.error(f"Unexpected login error for {email}: {str(e)}")
 
 
