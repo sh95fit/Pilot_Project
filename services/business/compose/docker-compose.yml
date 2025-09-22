@@ -27,6 +27,9 @@ services:
       context: ../../../          # 루트 디렉토리를 context로 설정
       dockerfile: services/business/backend/Dockerfile
       target: ${BUILD_TARGET:-dev}
+      args:
+        - APP_UID=${DOCKER_UID:-1001}
+        - APP_GID=${DOCKER_GID:-1001}
     container_name: business_backend
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-dev}

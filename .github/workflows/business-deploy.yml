@@ -113,6 +113,10 @@ jobs:
             echo "DOCKER_UID=$CURRENT_UID" >> $CONFIG_DIR/main.env
             echo "DOCKER_GID=$CURRENT_GID" >> $CONFIG_DIR/main.env
 
+            # 환경변수를 현재 쉘에도 로드
+            export DOCKER_UID=$CURRENT_UID
+            export DOCKER_GID=$CURRENT_GID
+
             ENV_FILE="$CONFIG_DIR/main.env"
 
             # 4️⃣ 기존 서비스 헬스체크 및 graceful shutdown
@@ -124,10 +128,11 @@ jobs:
 
             # 5️⃣ 이미지 빌드 및 배포
             echo "🔨 Building images..."
-            BUILD_TARGET=prod ENVIRONMENT=prod sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
+            BUILD_TARGET=prod ENVIRONMENT=prod sudo -E docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
 
             echo "🚢 Starting services..."
-            BUILD_TARGET=prod ENVIRONMENT=prod sudo docker compose --env-file $ENV_FILE -f docker-compose.yml -f docker-compose.prod.yml up -d
+            echo "🚢 Starting services..."
+            BUILD_TARGET=prod ENVIRONMENT=prod DOCKER_UID=$CURRENT_UID DOCKER_GID=$CURRENT_GID sudo -E docker compose --env-file $ENV_FILE -f docker-compose.yml -f docker-compose.prod.yml up -d
 
             # 6️⃣ Nginx 설정 테스트 및 재로드
             echo "🔄 Reloading nginx..."
