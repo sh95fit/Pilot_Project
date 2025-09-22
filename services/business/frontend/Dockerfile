@@ -69,9 +69,14 @@ COPY ./services/business/frontend/.streamlit/config.toml ./.streamlit/config.tom
 RUN poetry config virtualenvs.create false && \
     poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
 
+# ubuntu 계정의 권한 1001:1001을 default로 지정
+ARG APP_UID=1001
+ARG APP_GID=1001
+
 # 비특권 사용자 생성 및 권한 설정
-RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
+RUN groupadd -g ${APP_GID} appuser \
+    && useradd -m -u ${APP_UID} -g ${APP_GID} -s /bin/bash appuser \
+    && chown -R appuser:appuser /app
 
 # HOME 환경 변수 설정 (streamlit이 /app/.streamlit에 접근하도록)
 ENV HOME=/app
