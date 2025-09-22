@@ -128,11 +128,10 @@ jobs:
 
             # 5️⃣ 이미지 빌드 및 배포
             echo "🔨 Building images..."
-            BUILD_TARGET=prod ENVIRONMENT=prod sudo -E docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
+            sudo -E BUILD_TARGET=prod ENVIRONMENT=prod DOCKER_UID=$CURRENT_UID DOCKER_GID=$CURRENT_GID docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
 
             echo "🚢 Starting services..."
-            echo "🚢 Starting services..."
-            BUILD_TARGET=prod ENVIRONMENT=prod DOCKER_UID=$CURRENT_UID DOCKER_GID=$CURRENT_GID sudo -E docker compose --env-file $ENV_FILE -f docker-compose.yml -f docker-compose.prod.yml up -d
+            sudo -E BUILD_TARGET=prod ENVIRONMENT=prod DOCKER_UID=$CURRENT_UID DOCKER_GID=$CURRENT_GID docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
             # 6️⃣ Nginx 설정 테스트 및 재로드
             echo "🔄 Reloading nginx..."
