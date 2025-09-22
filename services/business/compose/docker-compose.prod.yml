@@ -44,6 +44,9 @@ services:
         max-file: "5"
 
   frontend:
+    args:
+      APP_UID: ${DOCKER_UID}
+      APP_GID: ${DOCKER_GID}
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       - DEBUG=false
