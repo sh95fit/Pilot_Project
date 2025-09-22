@@ -1,37 +1,38 @@
-[server]
-baseUrlPath = "/"
-
+#[server]
+#baseUrlPath = "/"
 # 헤드리스 모드 (브라우저 자동 실행 안함)
-headless = true
-
+#headless = true
 # 서버 주소 및 포트
-address = "0.0.0.0"
-port = 8501
-
+#address = "0.0.0.0"
+#port = 8501
 # CORS/XSRF
-enableCORS = false
-enableXsrfProtection = false
-
+#enableCORS = false
+#enableXsrfProtection = false
 # 웹소켓 압축
-enableWebsocketCompression = true
-
+#enableWebsocketCompression = true
 # 정적 파일 제공 (없으면 false)
-enableStaticServing = false
-
+#enableStaticServing = false
 # 파일 감시
-runOnSave = false
-fileWatcherType = "none"
+#runOnSave = false
+#fileWatcherType = "none"
+# 프록시 환경에서 필요한 설정들
+#allowRunOnSave = false
+#maxUploadSize = 1028
+#maxMessageSize = 200
 
-[browser]
-gatherUsageStats = false
+#[browser]
+#gatherUsageStats = false
+# nginx 프록시를 통한 접근을 위한 설정
+#serverAddress = "prototype.lunchlab.me"
+#serverPort = 443
 
-[client]
-showErrorDetails = false
-toolbarMode = "minimal"
+#[client]
+#showErrorDetails = false
+#toolbarMode = "minimal"
 
-[theme]
-base = "light"
+#[theme]
+#base = "light"
 
-[logger]
-level = "info"
-messageFormat = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+#[logger]
+#level = "info"
+#messageFormat = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
