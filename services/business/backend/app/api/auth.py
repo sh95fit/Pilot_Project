@@ -15,7 +15,7 @@ from shared.auth.crypto import CryptoHandler
 from shared.auth.cognito_client import CognitoClient
 from shared.database.supabase_client import SupabaseClient
 from shared.database.redis_client import RedisClient
-from ..core.dependencies import (
+from ..core.dependencies.auth import (
     get_cognito_client, 
     get_supabase_client, 
     get_redis_client, 

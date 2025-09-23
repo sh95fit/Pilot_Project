@@ -136,7 +136,6 @@ class AuthService:
             raise HTTPException(status_code=500, detail="Internal server error")
     
     @staticmethod
-    @staticmethod
     async def _cleanup_existing_sessions(
         user_id: uuid.UUID, 
         redis_client: RedisClient, 
