@@ -55,6 +55,8 @@ typer = "^0.9.0"
 rich = "^13.7.0"
 cryptography = "^45.0.7"
 aioboto3 = "^15.1.0"
+asyncio = "^4.0.0"
+asyncssh = "^2.21.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"

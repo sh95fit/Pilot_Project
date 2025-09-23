@@ -6,8 +6,10 @@ import os
 from contextlib import asynccontextmanager
 
 from .api import auth, health
+from .api.v1 import data
 from .middleware.auth_middleware import AuthMiddleware
 from .core.config import settings
+from .core.database import database_manager
 
 
 @asynccontextmanager
@@ -17,11 +19,24 @@ async def lifespan(app: FastAPI):
     print(f"🚀 Starting FastAPI application in {settings.environment} mode")
     print(f"🔧 Debug: {settings.debug}")
     print(f"📊 Log level: {settings.log_level}")
-    
-    yield
-    
-    # 종료 시 실행
-    print("🛑 Shutting down FastAPI application")
+
+    # ✅ 모든 DB 초기화
+    try:
+        await database_manager.initialize()
+        print("✅ All database clients initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize database clients: {e}")
+        raise
+
+    try:
+        yield
+    finally:
+        # 종료 시 연결 종료
+        try:
+            await database_manager.close()
+            print("🛑 Database manager closed")
+        except Exception as e:
+            print(f"⚠️ Failed to close database manager: {e}")
 
 
 def create_app() -> FastAPI:
@@ -62,6 +77,7 @@ def create_app() -> FastAPI:
     # 라우터 등록
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(data.router)
 
     # 보호된 API 예시
     @app.get("/api/dashboard")

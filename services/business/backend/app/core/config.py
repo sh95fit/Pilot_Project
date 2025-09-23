@@ -6,6 +6,8 @@ import logging
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
+import paramiko
+
 logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
@@ -23,9 +25,64 @@ class Settings(BaseSettings):
     cognito_client_id: str
     # cognito_client_secret: str
 
-    # Supabase 설정
+    # Supabase 설정 (Auth - lunchlab_erp)
     supabase_url: str
     supabase_service_key: str
+    
+    # Supabase 설정 (Data - lunchlab)
+    supabase_data_url: str
+    supabase_data_service_key: str
+    
+    # MySQL by SSH Tunneling
+    ssh_host: str
+    ssh_port: int 
+    ssh_user: str
+    ssh_key_path: str
+    
+    # SSH 키 property 추가
+    @property
+    def ssh_private_key(self):
+        """SSH private key 객체 반환"""
+        if self.ssh_key_path and os.path.exists(self.ssh_key_path):
+            try:
+                # paramiko 호환 키 객체 생성
+                return paramiko.RSAKey.from_private_key_file(self.ssh_key_path)
+            except paramiko.ssh_exception.SSHException:
+                try:
+                    # ED25519 키 시도
+                    return paramiko.Ed25519Key.from_private_key_file(self.ssh_key_path)
+                except paramiko.ssh_exception.SSHException:
+                    try:
+                        # ECDSA 키 시도
+                        return paramiko.ECDSAKey.from_private_key_file(self.ssh_key_path)
+                    except paramiko.ssh_exception.SSHException:
+                        logger.error(f"Unsupported SSH key format: {self.ssh_key_path}")
+                        return None
+            except Exception as e:
+                logger.error(f"Error loading SSH private key: {e}")
+                return None
+        return None
+    
+    @property 
+    def ssh_private_key_string(self):
+        """SSH private key를 문자열로 반환 (sshtunnel 호환)"""
+        if self.ssh_key_path and os.path.exists(self.ssh_key_path):
+            try:
+                with open(self.ssh_key_path, 'r') as f:
+                    return f.read()
+            except Exception as e:
+                logger.error(f"Error reading SSH key file: {e}")
+                return None
+        return None
+    
+    
+    
+    mysql_host: str
+    mysql_port: int
+    mysql_user: str
+    mysql_password: str
+    mysql_main_database: str
+    mysql_account_database: str
     
     # Redis 설정
     redis_url: str = "redis://redis:6379"
