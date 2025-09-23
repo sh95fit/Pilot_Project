@@ -7,7 +7,7 @@ from shared.auth.crypto import CryptoHandler
 from shared.auth.cognito_client import CognitoClient
 from shared.database.supabase_client import SupabaseClient
 from shared.database.redis_client import RedisClient
-from .config import settings
+from ..config import settings
 
 # 의존성 주입을 위한 팩토리 함수들
 
@@ -55,12 +55,3 @@ def get_redis_client() -> RedisClient:
         redis_username=settings.redis_username,
         redis_password=settings.redis_password
     )
-
-
-# 전역 인스턴스 (기존 코드 호환용 - 점진적 마이그레이션을 위해)
-# 추후 제거 예정
-# jwt_handler = get_jwt_handler()
-# crypto_handler = get_crypto_handler()
-# cognito_client = get_cognito_client()
-# supabase_client = get_supabase_client()
-# redis_client = get_redis_client()
