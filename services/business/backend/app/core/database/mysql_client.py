@@ -56,7 +56,8 @@ class MySQLClient:
                     local_bind_address=("127.0.0.1", 0)  # 자동 포트 할당
                 )
                 self.ssh_tunnel.start()
-                self.local_port = self.ssh_tunnel.local_bind_port
+                self.local_port = self.ssh_tunnel.local_bind_port        
+                
                 logger.info(f"SSH tunnel established on port {self.local_port}")
             except Exception as e:
                 logger.error(f"Failed to setup SSH tunnel: {e}")
