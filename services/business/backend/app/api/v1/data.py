@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, Dict, Any, List
 import logging
 from ...core.database import database_manager
-from ...models.data import ProcedureRequest
+from ...models.data import ProcedureRequest, SalesSummaryWrapper
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/data", tags=["data"])
@@ -23,7 +23,7 @@ async def health_check():
         raise HTTPException(status_code=500, detail="Health check failed")
 
 @router.post("/get_min_order_summary")
-async def execute_mysql_procedure(
+async def get_min_order_summary(
     request: ProcedureRequest
 ):
     """MySQL 프로시저 실행"""
@@ -40,6 +40,28 @@ async def execute_mysql_procedure(
             "count": len(result)
         }
         
+    except Exception as e:
+        logger.error(f"MySQL procedure error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.post("/get_sales_summary", response_model=SalesSummaryWrapper)
+async def get_sales_summary(
+    request: ProcedureRequest
+):
+    """매출 요약 조회 (MySQL 프로시저 호출)"""
+    try:
+        result = await database_manager.mysql.execute_procedure(
+            proc_name=request.procedure_name,
+            params=tuple(request.params) if request.params else None,
+            db_name=request.db_name
+        )
+        
+        return {
+            "success": True,
+            "count": len(result or []),
+            "data": result
+        }
     except Exception as e:
         logger.error(f"MySQL procedure error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
