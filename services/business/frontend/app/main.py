@@ -62,7 +62,12 @@ def main():
         page_title=settings.PAGE_TITLE,
         page_icon=settings.PAGE_ICON,
         layout="wide",
-        initial_sidebar_state="expanded"
+        initial_sidebar_state="expanded",
+        menu_items={  # 기본 메뉴 비활성화
+            "Get Help": None,
+            "Report a Bug": None,
+            "About": None
+        }
     )
 
     # 세션 상태 초기화
