@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, Request, status
 from typing import Dict, Any, Optional
 
-from .dependencies.auth import get_jwt_handler, get_redis_client, get_supabase_client
+from backend.app.core.dependencies.auth import get_jwt_handler, get_redis_client, get_supabase_client
 from shared.auth.jwt_handler import JWTHandler
 from shared.database.redis_client import RedisClient
 from shared.database.supabase_client import SupabaseClient

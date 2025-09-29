@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from shared.database.supabase_client import SupabaseClient
 from shared.database.redis_client import RedisClient
-from ..core.dependencies.auth import get_supabase_client, get_redis_client
+from backend.app.core.dependencies.auth import get_supabase_client, get_redis_client
 import logging
 
 router = APIRouter(tags=["health"])
