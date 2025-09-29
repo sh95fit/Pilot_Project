@@ -142,24 +142,53 @@ class AuthManager:
                 return False, None
             
             # 3. 토큰 만료 확인 및 갱신
-            if self.session_manager.is_token_expired(access_token):
-                logger.debug("Token expired, attempting refresh")
-                if self._refresh_token(access_token, session_id):
-                    access_token, session_id = self.session_manager.get_auth_tokens()
-                    logger.debug("Token refreshed successfully")
-                else:
-                    logger.warning("Token refresh failed")
-                    # 실제 토큰 만료/갱신 실패 시에만 삭제
-                    self._clear_auth_state()
-                    return False, None
+            # if self.session_manager.is_token_expired(access_token):
+            #     logger.debug("Token expired, attempting refresh")
+            #     if self._refresh_token(access_token, session_id):
+            #         access_token, session_id = self.session_manager.get_auth_tokens()
+            #         logger.debug("Token refreshed successfully")
+            #     else:
+            #         logger.warning("Token refresh failed")
+            #         # 실제 토큰 만료/갱신 실패 시에만 삭제
+            #         self._clear_auth_state()
+            #         return False, None
             
-            # 4. 토큰 갱신 임계점 확인 
-            elif self.session_manager.should_refresh_token(
+            # # 4. 토큰 갱신 임계점 확인 
+            # elif self.session_manager.should_refresh_token(
+            #     access_token, 
+            #     settings.TOKEN_REFRESH_THRESHOLD_MINUTES
+            # ):
+            #     logger.debug("Token needs refresh (threshold reached)")
+            #     self._refresh_token(access_token, session_id)
+
+            # 3. 토큰 만료 및 갱신 필요 여부 확인
+            token_expired = self.session_manager.is_token_expired(access_token)
+            needs_refresh = self.session_manager.should_refresh_token(
                 access_token, 
                 settings.TOKEN_REFRESH_THRESHOLD_MINUTES
-            ):
-                logger.debug("Token needs refresh (threshold reached)")
-                self._refresh_token(access_token, session_id)
+            )      
+
+            # 4. 토큰 갱신 처리
+            if token_expired or needs_refresh:
+                refresh_type = "expired" if token_expired else "threshold reached"
+                logger.debug(f"Token {refresh_type}, attempting refresh")
+                
+                refresh_success = self._refresh_token(access_token, session_id)
+                
+                if refresh_success:
+                    # ✅ 갱신된 토큰 다시 가져오기
+                    access_token, session_id = self.session_manager.get_auth_tokens()
+                    logger.info(f"Token refreshed successfully ({refresh_type})")
+                else:
+                    logger.warning(f"Token refresh failed ({refresh_type})")
+                    # 토큰이 완전히 만료된 경우에만 인증 상태 삭제
+                    if token_expired:
+                        logger.error("Token expired and refresh failed - clearing auth state")
+                        self._clear_auth_state()
+                        return False, None
+                    else:
+                        # 임계점 갱신 실패는 다음에 재시도 (현재 토큰으로 계속 진행)
+                        logger.warning("Threshold refresh failed but token still valid - continuing")             
 
             # 5. 서버에서 인증 상태 최종 확인 (기존 유지)
             auth_result = self.api_client.check_auth(access_token, session_id)
@@ -230,41 +259,83 @@ class AuthManager:
     def _refresh_token(self, access_token: str, session_id: str) -> bool:
         """
         토큰 갱신 - 동기화 처리 포함
+        
+        Returns:
+            bool: 갱신 성공 여부
         """
         try:
             logger.debug("Attempting token refresh")
             
             result = self.api_client.refresh_token(access_token, session_id)
-            
+                
+            # result가 None이거나 success가 False인 경우
             if not result or not result.get('success'):
                 logger.warning("Token refresh API call failed")
                 return False
-            
-            # 새로운 토큰 정보가 있으면 업데이트
-            tokens = result.get('tokens')
-            if tokens:
-                new_access_token = tokens.get("access_token")
-                new_session_id = tokens.get('session_id')
-                expires_in = tokens.get('expires_in', 3600)
+
+            # # 새로운 토큰 정보가 있으면 업데이트
+            # tokens = result.get('tokens')
+            # if tokens:
+            #     new_access_token = tokens.get("access_token")
+            #     new_session_id = tokens.get('session_id')
+            #     expires_in = tokens.get('expires_in', 3600)
                 
-                if new_access_token and new_session_id:
-                    # 새로운 토큰으로 업데이트 (동기화 포함)
-                    expires_minutes = expires_in // 60
-                    update_success = self.session_manager.set_auth_tokens(
-                        new_access_token, new_session_id, expires_minutes
-                    )
+            #     if new_access_token and new_session_id:
+            #         # 새로운 토큰으로 업데이트 (동기화 포함)
+            #         expires_minutes = expires_in // 60
+            #         update_success = self.session_manager.set_auth_tokens(
+            #             new_access_token, new_session_id, expires_minutes
+            #         )
                     
-                    if update_success:
-                        logger.debug("Token refresh and sync completed")
-                        return True
-                    else:
-                        logger.error("Token refresh succeeded but sync failed")
-                        return False
+            #         if update_success:
+            #             logger.debug("Token refresh and sync completed")
+            #             return True
+            #         else:
+            #             logger.error("Token refresh succeeded but sync failed")
+            #             return False
             
-            # 토큰 정보가 없어도 서버에서 갱신이 성공했다면 true 반환
-            logger.debug("Token refreshed on server (no new tokens provided)")
-            return True
+            # # 토큰 정보가 없어도 서버에서 갱신이 성공했다면 true 반환
+            # logger.debug("Token refreshed on server (no new tokens provided)")
+            # return True
         
+
+            # ✅ tokens는 result의 두 번째 값 (Tuple 반환 구조)
+            # API client가 (success, tokens) 형태로 반환한다고 가정
+            tokens = result.get('tokens')
+
+            # tokens가 None인 경우 갱신 실패
+            if not tokens:
+                logger.warning("Token refresh failed: no tokens in response")
+                return False
+            
+            new_access_token = tokens.get("access_token")
+            new_session_id = tokens.get('session_id')
+            expires_in = tokens.get('expires_in', 3600)
+            
+            if not new_access_token or not new_session_id:
+                logger.warning(f"Invalid tokens in refresh response: access_token={bool(new_access_token)}, session_id={bool(new_session_id)}")
+                return False
+            
+            # ✅ 새로운 토큰으로 업데이트 (동기화 포함)
+            expires_minutes = expires_in // 60
+            update_success = self.session_manager.set_auth_tokens(
+                new_access_token, 
+                new_session_id, 
+                expires_minutes
+            )
+            
+            if update_success:
+                logger.info("Token refresh and sync completed successfully")
+                
+                # 디버깅: 동기화 상태 확인
+                sync_status = self.session_manager.get_sync_status()
+                logger.debug(f"Post-refresh sync status: {sync_status}")
+                
+                return True
+            else:
+                logger.error("Token refresh succeeded but sync failed")
+                return False
+
         except Exception as e:
             logger.error(f"Token refresh error: {e}")
             return False
