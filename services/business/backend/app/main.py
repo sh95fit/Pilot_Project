@@ -5,11 +5,24 @@ import uvicorn
 import os
 from contextlib import asynccontextmanager
 
-from .api import auth, health
-from .api.v1 import data
-from .middleware.auth_middleware import AuthMiddleware
-from .core.config import settings
-from .core.database import database_manager
+from backend.app.api import auth, health
+from backend.app.api.v1.router import api_router as api_v1_router
+from backend.app.middleware.auth_middleware import AuthMiddleware
+from backend.app.core.config import settings
+from backend.app.core.database import database_manager
+
+from backend.app.core.exceptions import (
+    BaseAPIException,
+    DatabaseConnectionError,
+    SSHTunnelError,
+    DataValidationError
+)
+from .middleware.error_handler import (
+    base_exception_handler,
+    database_exception_handler,
+    ssh_tunnel_exception_handler,
+    validation_exception_handler
+)
 
 
 @asynccontextmanager
@@ -60,6 +73,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # 예외 핸들러 등록
+    app.add_exception_handler(BaseAPIException, base_exception_handler)
+    app.add_exception_handler(DatabaseConnectionError, database_exception_handler)
+    app.add_exception_handler(SSHTunnelError, ssh_tunnel_exception_handler)
+    app.add_exception_handler(DataValidationError, validation_exception_handler)
+
     # 커스텀 인증 미들웨어 추가
     app.add_middleware(
         AuthMiddleware,
@@ -77,7 +96,7 @@ def create_app() -> FastAPI:
     # 라우터 등록
     app.include_router(health.router)
     app.include_router(auth.router)
-    app.include_router(data.router)
+    app.include_router(api_v1_router, prefix="/api/v1")
 
     # 보호된 API 예시
     @app.get("/api/dashboard")
@@ -98,12 +117,27 @@ def create_app() -> FastAPI:
     async def global_exception_handler(request: Request, exc: Exception):
         if settings.debug:
             import traceback
-            print(f"Global exception: {exc}")
-            print(traceback.format_exc())
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": {
+                        "message": str(exc),
+                        "type": exc.__class__.__name__,
+                        "traceback": traceback.format_exc()
+                    }
+                }
+            )
         
         return JSONResponse(
             status_code=500,
-            content={"detail": "Internal server error"}
+            content={
+                "success": False,
+                "error": {
+                    "message": "Internal server error",
+                    "type": "InternalError"
+                }
+            }
         )
 
     return app

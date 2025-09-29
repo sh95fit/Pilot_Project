@@ -7,7 +7,7 @@ from shared.auth.crypto import CryptoHandler
 from shared.auth.cognito_client import CognitoClient
 from shared.database.supabase_client import SupabaseClient
 from shared.database.redis_client import RedisClient
-from ..config import settings
+from backend.app.core.config import settings
 
 # 의존성 주입을 위한 팩토리 함수들
 

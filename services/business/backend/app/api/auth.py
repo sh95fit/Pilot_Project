@@ -3,9 +3,9 @@ from pydantic import BaseModel, EmailStr
 from typing import Dict, Any
 import logging
 
-from ..services.auth_service import AuthService
-from ..core.security import get_current_user_from_cookie
-from ..models.auth import (
+from backend.app.services.auth_service import AuthService
+from backend.app.core.security import get_current_user_from_cookie
+from backend.app.models.auth import (
     LoginRequest, LoginResponse, TokenRefreshResponse, 
     LogoutResponse, UserInfoResponse
 )
@@ -15,7 +15,7 @@ from shared.auth.crypto import CryptoHandler
 from shared.auth.cognito_client import CognitoClient
 from shared.database.supabase_client import SupabaseClient
 from shared.database.redis_client import RedisClient
-from ..core.dependencies.auth import (
+from backend.app.core.dependencies.auth import (
     get_cognito_client, 
     get_supabase_client, 
     get_redis_client, 

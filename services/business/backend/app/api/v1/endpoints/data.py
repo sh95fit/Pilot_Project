@@ -1,11 +1,15 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, Dict, Any, List
 import logging
-from ...core.database import database_manager
-from ...models.data import ProcedureRequest, SalesSummaryWrapper
+from backend.app.core.database import database_manager
+from backend.app.api.v1.schemas.data import ProcedureRequest, SalesSummaryWrapper, SalesSummaryRequest
+from backend.app.core.exceptions import DataValidationError
+from backend.app.core.dependencies.data import get_db
+from backend.app.services.data_service import DataService
+
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/v1/data", tags=["data"])
+router = APIRouter(prefix="/data", tags=["data"])
 
 @router.get("/health")
 async def health_check():
@@ -45,23 +49,41 @@ async def get_min_order_summary(
         raise HTTPException(status_code=500, detail=str(e))
     
 
+# @router.post("/get_sales_summary", response_model=SalesSummaryWrapper)
+# async def get_sales_summary(
+#     request: ProcedureRequest
+# ):
+#     """매출 요약 조회 (MySQL 프로시저 호출)"""
+#     try:
+#         result = await database_manager.mysql.execute_procedure(
+#             proc_name=request.procedure_name,
+#             params=tuple(request.params) if request.params else None,
+#             db_name=request.db_name
+#         )
+        
+#         return {
+#             "success": True,
+#             "count": len(result or []),
+#             "data": result
+#         }
+#     except Exception as e:
+#         logger.error(f"MySQL procedure error: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
+
+    
+
+# 파일 분리 예시 (base.py -> data_repository.py -> data_service.py -> endpoints/data.py)
 @router.post("/get_sales_summary", response_model=SalesSummaryWrapper)
 async def get_sales_summary(
-    request: ProcedureRequest
-):
-    """매출 요약 조회 (MySQL 프로시저 호출)"""
+    request: SalesSummaryRequest,
+    db = Depends(get_db)
+): 
+    service = DataService(db)
+    
     try:
-        result = await database_manager.mysql.execute_procedure(
-            proc_name=request.procedure_name,
-            params=tuple(request.params) if request.params else None,
-            db_name=request.db_name
-        )
-        
-        return {
-            "success": True,
-            "count": len(result or []),
-            "data": result
-        }
+        result = await service.get_sales_summary(request)
+        return result
+    except DataValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"MySQL procedure error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

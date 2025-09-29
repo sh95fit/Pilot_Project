@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import date
 
 class ProcedureRequest(BaseModel):
     procedure_name: str
@@ -15,3 +16,7 @@ class SalesSummaryWrapper(BaseModel):
     success: bool
     count: int
     data: List[SalesSummaryResponse]
+
+class SalesSummaryRequest(BaseModel):
+    start_date: date
+    end_date: date
