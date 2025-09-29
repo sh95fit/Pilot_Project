@@ -58,9 +58,16 @@ def fetch_sales_summary(
         "cookie": f"access_token={access_token}; session_id={session_id}"
     }
     
+    # 파일 미분리 형태
+    # payload = {
+    #     "procedure_name": "get_sales_summary",
+    #     "params": [start_date, end_date]
+    # }
+
+    # 파일 분리 형태
     payload = {
-        "procedure_name": "get_sales_summary",
-        "params": [start_date, end_date]
+        "start_date": start_date,
+        "end_date": end_date
     }
     
     logger.info(f"API 호출: {start_date} ~ {end_date}")
