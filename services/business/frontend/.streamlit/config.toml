@@ -26,9 +26,9 @@
 #serverAddress = "prototype.lunchlab.me"
 #serverPort = 443
 
-#[client]
+[client]
 #showErrorDetails = false
-#toolbarMode = "minimal"
+toolbarMode = "minimal"
 
 #[theme]
 #base = "light"
