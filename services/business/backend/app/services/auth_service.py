@@ -262,14 +262,14 @@ class AuthService:
             
             if not session_data:
                 logger.warning(f"Session {session_id} not found")
-                return False
+                return False, None
 
             # 2. 세션 만료 확인
             refresh_expires_at = datetime.fromisoformat(session_data["refresh_expires_at"])
             if refresh_expires_at <= datetime.utcnow():
                 logger.warning(f"Session {session_id} has expired")
                 await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
-                return False
+                return False, None
                 
             # 3. Refresh token 복호화 및 갱신
             refresh_token = crypto_handler.decrypt(session_data["refresh_token_enc"])
@@ -278,7 +278,7 @@ class AuthService:
             if not new_tokens:
                 logger.warning(f"Session {session_id} token could not be refreshed")
                 await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
-                return False
+                return False, None
             
             # 4. Refresh token rotation 처리
             if "refresh_token" in new_tokens and new_tokens['refresh_token']:

@@ -176,7 +176,8 @@ async def refresh(
             # 기본 응답
             refresh_response = {
                 "success": True,
-                "message": "Tokens refreshed successfully"
+                "message": "Tokens refreshed successfully",
+                
             }
             
             # Streamlit 환경을 위한 토큰 정보 추가
