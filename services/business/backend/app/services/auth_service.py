@@ -31,6 +31,7 @@ class AuthService:
             "samesite": "lax" if is_dev else "strict",  # 개발환경에서는 더 관대하게
         }
 
+##################################################################################################
     @staticmethod
     async def login(
         email: str, 
@@ -78,7 +79,7 @@ class AuthService:
             
             # 5. Refresh token 암호화 및 저장
             encrypted_refresh_token = crypto_handler.encrypt(cognito_tokens['refresh_token'])
-            
+
             # Refresh token 만료 시간 계산 (기본적으로 7일, Cognito 설정에 따라 조정)
             refresh_expires_at = datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days)
             
@@ -207,83 +208,9 @@ class AuthService:
                 f"Failed to cleanup existing sessions for user {user_id}: {e}"
             )
                    
-                # existing_sessions = await supabase_client.get_user_sessions(
-                #     user_id, 
-                #     active_only=True
-                # )
-                
-                # for session in existing_sessions:
-                #     redis_client.delete_session(session.session_id)
-                
-                # if existing_sessions:
-                #     logger.info(
-                #         f"User {user_id}: cleared {len(existing_sessions)} "
-                #         f"Redis session caches (single session policy)"
-                #     )
-                    
-            # else:
-            #     # 다중 세션 허용: 최대 세션 수 체크
-            #     max_sessions = getattr(settings, 'max_sessions_per_user', 3)
-            #     existing_sessions = await supabase_client.get_user_sessions(
-            #         user_id, 
-            #         active_only=True
-            #     )
-                
-            #     if len(existing_sessions) >= max_sessions:
-            #         # 가장 오래된 세션부터 제거 (최신 세션은 유지)
-            #         sessions_sorted = sorted(
-            #             existing_sessions, 
-            #             key=lambda x: x.created_at
-            #         )
-                    
-            #         # 삭제할 개수 계산
-            #         num_to_revoke = len(existing_sessions) - max_sessions + 1
-            #         sessions_to_revoke = sessions_sorted[:num_to_revoke]
-                    
-            #         for session in sessions_to_revoke:
-            #             # Redis 캐시 삭제
-            #             redis_client.delete_session(session.session_id)
-            #             # DB에서 revoke (삭제 아님)
-            #             await supabase_client.revoke_session(session.session_id)
-                    
-            #         logger.info(
-            #             f"User {user_id}: revoked {len(sessions_to_revoke)} "
-            #             f"old sessions (max sessions: {max_sessions})"
-            #         )
-                
-        # except Exception as e:
-        #     logger.warning(
-        #         f"Failed to cleanup existing sessions for user {user_id}: {e}"
-        #     )
-                
-        
-        # try:
-        #     if not settings.allow_multiple_sessions:
-        #         # 단일 세션 정책: 모든 기존 세션 삭제
-        #         existing_sessions = await supabase_client.get_user_sessions(user_id, active_only=True)
-        #         for session in existing_sessions:
-        #             redis_client.delete_session(session.session_id)
-        #             await supabase_client.delete_session_permanently(session.session_id)
-                
-        #         logger.info(f"User {user_id}: deleted {len(existing_sessions)} existing sessions (single session policy)")
-            
-        #     else:
-        #         # 다중 세션 허용: 최대 세션 수 체크
-        #         max_sessions = getattr(settings, 'max_sessions_per_user', 3)
-        #         existing_sessions = await supabase_client.get_user_sessions(user_id, active_only=True)
-                
-        #         if len(existing_sessions) >= max_sessions:
-        #             # 세션 수가 최대치에 도달했으면 오래된 세션부터 삭제
-        #             sessions_to_delete = sorted(existing_sessions, key=lambda x: x.created_at)[:-max_sessions+1]
-                    
-        #             for session in sessions_to_delete:
-        #                 redis_client.delete_session(session.session_id)
-        #                 await supabase_client.delete_session_permanently(session.session_id)
-                    
-        #             logger.info(f"User {user_id}: deleted {len(sessions_to_delete)} old sessions (max sessions: {max_sessions})")
-                
-        # except Exception as e:
-        #     logger.warning(f"Failed to cleanup existing sessions for user {user_id}: {e}")
+##################################################################################################
+   
+   
     
     @staticmethod
     def _extract_device_info(request: Request) -> Dict[str, str]:
@@ -363,14 +290,16 @@ class AuthService:
         jwt_handler: JWTHandler
     ) -> Tuple[bool, Optional[Dict]]:
         """
-        토큰 갱신 - Streamlit 지원을 위해 새 토큰을 반환값으로도 제공
+        토큰 갱신 - 로컬 Refresh Token 만료 체크 우선
         
-        Returns:
-            Tuple[success: bool, tokens: Optional[Dict]]
-            tokens contains: {"access_token": str, "session_id": str, "expires_in": int}
+        로직:
+        1. 세션 조회 (Redis/DB)
+        2. refresh_expires_at 확인
+        - 만료되지 않음 → 새 Access Token만 발급 (Cognito 호출 X)
+        - 만료됨 → Cognito에 Refresh Token 검증 요청
         """
         try:
-            # 1. Redis에서 세션 조회
+            # 1. Redis/DB에서 세션 조회
             session_data = await AuthService._get_session_data(
                 session_id, redis_client, supabase_client
             )
@@ -379,71 +308,172 @@ class AuthService:
                 logger.warning(f"Session {session_id} not found")
                 return False, None
 
-            # 2. 세션 만료 확인
+            # 2. 로컬 Refresh Token 만료 확인
             refresh_expires_at = datetime.fromisoformat(session_data["refresh_expires_at"])
-            if refresh_expires_at <= datetime.utcnow():
-                logger.warning(f"Session {session_id} has expired")
-                await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
-                return False, None
-                
-            # 3. Refresh token 복호화 및 갱신
-            refresh_token = crypto_handler.decrypt(session_data["refresh_token_enc"])
+            now = datetime.utcnow()
             
-            try:
-                new_tokens = await cognito_client.refresh_token(refresh_token)
-                
-            except RefreshTokenError as e:
-                # Refresh Token 관련 명확한 에러 처리
-                logger.error(
-                    f"Session {session_id} refresh token error: "
-                    f"type={e.error_type}, message={e.message}"
+            if refresh_expires_at <= now:
+                # 완전 만료 → 로그아웃 필요
+                logger.warning(f"Session {session_id} refresh token expired at {refresh_expires_at}")
+                await AuthService._invalidate_session(
+                    session_id, response, redis_client, supabase_client
                 )
+                return False, None
+            
+            # 3. Refresh Token 임박 만료 체크 (예: 1일 이내)
+            time_until_expire = (refresh_expires_at - now).total_seconds()
+            should_rotate = time_until_expire < getattr(settings, 'refresh_token_rotation_threshold_seconds', 86400)  # 기본 1일
+            
+            if should_rotate:
+                # 3-1. Cognito에 Refresh Token 검증 및 갱신 요청
+                logger.info(f"Session {session_id} refresh token near expiry, rotating via Cognito")
                 
-                # Refresh Token 만료 또는 무효화 시 세션 무효화
-                if e.error_type in ["expired", "invalid"]:
-                    await AuthService._invalidate_session(
-                        session_id, response, redis_client, supabase_client
+                refresh_token = crypto_handler.decrypt(session_data["refresh_token_enc"])
+                
+                try:
+                    new_tokens = await cognito_client.refresh_token(refresh_token)
+                    
+                except RefreshTokenError as e:
+                    logger.error(f"Session {session_id} Cognito refresh failed: {e.error_type} - {e.message}")
+                    
+                    if e.error_type in ["expired", "invalid"]:
+                        await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
+                    
+                    return False, None
+                
+                if not new_tokens:
+                    logger.warning(f"Session {session_id} Cognito refresh returned no tokens")
+                    await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
+                    return False, None
+                
+                # 3-2. Refresh Token Rotation 처리
+                if "refresh_token" in new_tokens and new_tokens['refresh_token']:
+                    await AuthService._rotate_refresh_token(
+                        session_id, new_tokens['refresh_token'], crypto_handler, 
+                        supabase_client, redis_client, session_data
                     )
-                
-                return False, None
-   
-            if not new_tokens:
-                logger.warning(f"Session {session_id} token could not be refreshed")
-                await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
-                return False, None
-            
-            # 4. Refresh token rotation 처리
-            if "refresh_token" in new_tokens and new_tokens['refresh_token']:
-                await AuthService._rotate_refresh_token(
-                    session_id, new_tokens['refresh_token'], crypto_handler, 
-                    supabase_client, redis_client, session_data
-                )
+                    logger.info(f"Session {session_id} refresh token rotated successfully")
+                else:
+                    # Rotation 없어도 last_used_at 갱신
+                    await supabase_client.update_session_last_used(session_id)
+                    logger.debug(f"Session {session_id} last_used_at updated (no rotation)")
             
             else:
-                # ✅ Rotation이 없어도 last_used_at 갱신
+                # 3-3. Cognito 호출 없이 로컬에서만 처리
+                logger.debug(f"Session {session_id} refresh token still valid, skipping Cognito rotation")
                 await supabase_client.update_session_last_used(session_id)
-                logger.debug(f"Session {session_id}: refresh token not rotated, updated last_used_at only") 
-                       
-            # 5. 새 Access token 발급 및 쿠키 설정
+            
+            # 4. 새 Access Token 발급 (항상 수행)
             new_access_token = await AuthService._issue_new_access_token(
                 session_data, session_id, jwt_handler, response, supabase_client
             )
             
-            # Streamlit 환경을 위한 토큰 정보 반환
             token_info = {
                 "access_token": new_access_token,
                 "session_id": session_id,
                 "expires_in": settings.jwt_access_token_expire_minutes * 60
             }
             
-            logger.info(f"Session {session_id} token refresh successful")
+            logger.info(f"Session {session_id} access token refreshed successfully")
             return True, token_info
-        
         
         except Exception as e:
             logger.error(f"Token refresh error: {e}", exc_info=True)
             return False, None
+ 
+ ##################################################################################################   
+    # @staticmethod
+    # async def refresh_tokens(
+    #     session_id: str, 
+    #     response: Response,
+    #     redis_client: RedisClient,
+    #     supabase_client: SupabaseClient,
+    #     crypto_handler: CryptoHandler,
+    #     cognito_client: CognitoClient,
+    #     jwt_handler: JWTHandler
+    # ) -> Tuple[bool, Optional[Dict]]:
+    #     """
+    #     토큰 갱신 - Streamlit 지원을 위해 새 토큰을 반환값으로도 제공
         
+    #     Returns:
+    #         Tuple[success: bool, tokens: Optional[Dict]]
+    #         tokens contains: {"access_token": str, "session_id": str, "expires_in": int}
+    #     """
+    #     try:
+    #         # 1. Redis에서 세션 조회
+    #         session_data = await AuthService._get_session_data(
+    #             session_id, redis_client, supabase_client
+    #         )
+            
+    #         if not session_data:
+    #             logger.warning(f"Session {session_id} not found")
+    #             return False, None
+
+    #         # 2. 세션 만료 확인
+    #         refresh_expires_at = datetime.fromisoformat(session_data["refresh_expires_at"])
+    #         if refresh_expires_at <= datetime.utcnow():
+    #             logger.warning(f"Session {session_id} has expired")
+    #             await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
+    #             return False, None
+                
+    #         # 3. Refresh token 복호화 및 갱신
+    #         refresh_token = crypto_handler.decrypt(session_data["refresh_token_enc"])
+            
+    #         try:
+    #             new_tokens = await cognito_client.refresh_token(refresh_token)
+                
+    #         except RefreshTokenError as e:
+    #             # Refresh Token 관련 명확한 에러 처리
+    #             logger.error(
+    #                 f"Session {session_id} refresh token error: "
+    #                 f"type={e.error_type}, message={e.message}"
+    #             )
+                
+    #             # Refresh Token 만료 또는 무효화 시 세션 무효화
+    #             if e.error_type in ["expired", "invalid"]:
+    #                 await AuthService._invalidate_session(
+    #                     session_id, response, redis_client, supabase_client
+    #                 )
+                
+    #             return False, None
+   
+    #         if not new_tokens:
+    #             logger.warning(f"Session {session_id} token could not be refreshed")
+    #             await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
+    #             return False, None
+            
+    #         # 4. Refresh token rotation 처리
+    #         if "refresh_token" in new_tokens and new_tokens['refresh_token']:
+    #             await AuthService._rotate_refresh_token(
+    #                 session_id, new_tokens['refresh_token'], crypto_handler, 
+    #                 supabase_client, redis_client, session_data
+    #             )
+            
+    #         else:
+    #             # ✅ Rotation이 없어도 last_used_at 갱신
+    #             await supabase_client.update_session_last_used(session_id)
+    #             logger.debug(f"Session {session_id}: refresh token not rotated, updated last_used_at only") 
+                       
+    #         # 5. 새 Access token 발급 및 쿠키 설정
+    #         new_access_token = await AuthService._issue_new_access_token(
+    #             session_data, session_id, jwt_handler, response, supabase_client
+    #         )
+            
+    #         # Streamlit 환경을 위한 토큰 정보 반환
+    #         token_info = {
+    #             "access_token": new_access_token,
+    #             "session_id": session_id,
+    #             "expires_in": settings.jwt_access_token_expire_minutes * 60
+    #         }
+            
+    #         logger.info(f"Session {session_id} token refresh successful")
+    #         return True, token_info
+        
+        
+    #     except Exception as e:
+    #         logger.error(f"Token refresh error: {e}", exc_info=True)
+    #         return False, None
+##################################################################################################        
         
     @staticmethod
     async def _get_session_data(

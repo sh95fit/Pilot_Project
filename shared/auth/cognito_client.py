@@ -116,13 +116,20 @@ class CognitoClient:
                     new_refresh = auth_result.get("RefreshToken")
                     if new_refresh:
                         logger.info("Cognito returned new refresh token (rotation enabled)")
+                        return {
+                            "access_token": auth_result.get("AccessToken"),
+                            "id_token": auth_result.get("IdToken"),
+                            "refresh_token": new_refresh,  # None이 아닌 경우
+                            "expires_in": auth_result.get("ExpiresIn"),
+                            "token_type": auth_result.get("TokenType")
+                        }
                     else:
                         logger.debug("Cognito did not return new refresh token (rotation disabled)")
                     
                     return {
                         "access_token": auth_result.get("AccessToken"),
                         "id_token": auth_result.get("IdToken"),
-                        "refresh_token": new_refresh,  # None일 수 있음
+                        # "refresh_token": new_refresh,  # None일 경우
                         "expires_in": auth_result.get("ExpiresIn"),
                         "token_type": auth_result.get("TokenType")
                     }

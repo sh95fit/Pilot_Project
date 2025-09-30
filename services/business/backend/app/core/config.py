@@ -114,6 +114,10 @@ class Settings(BaseSettings):
     # 단일 세션 정책 적용 여부
     allow_multiple_sessions: bool = False
     max_sessions_per_user: int = 3
+ 
+    # Refresh Token 설정
+    refresh_token_rotation_threshold_seconds: int = 86400  # 1일 이내 만료 시 Cognito rotation
+    token_refresh_threshold_minutes: int = 5  # Access Token 5분 이내 만료 시 갱신
     
     # RSA 키
 
