@@ -70,6 +70,33 @@ def main():
         }
     )
 
+    # 🎯 전역 CSS - 깜빡임 방지 및 부드러운 전환
+    st.markdown("""
+    <style>
+    /* 페이지 로드 시 깜빡임 방지 */
+    .main .block-container {
+        animation: fadeIn 0.3s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+    
+    /* Streamlit 기본 푸터 숨김 */
+    footer {visibility: hidden;}
+    
+    /* 헤더 여백 조정 */
+    .main > div {
+        padding-top: 2rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     # 세션 상태 초기화
     init_session_state()
 
@@ -80,7 +107,15 @@ def main():
     }
 
     # 인증 상태 확인 (매번 실행)
-    is_authenticated, user_info = check_auth_state()
+    # 🔄 인증 체크 전 로딩 표시
+    if not st.session_state.auth_checked:
+        # 첫 로드 시에만 로딩 표시
+        with st.spinner(""):
+            is_authenticated, user_info = check_auth_state()
+    else:
+        # 이미 체크된 경우 바로 실행
+        is_authenticated, user_info = check_auth_state()
+
 
     if not is_authenticated:
         # 로그인이 필요한 경우
@@ -91,14 +126,24 @@ def main():
 
 def _render_login_page():
     """로그인 페이지 렌더링"""
-    # 사이드바 숨김
+    # 사이드바 숨김 + 부드러운 애니메이션
     st.markdown("""
     <style>
-    [data-testid="stSidebar"] {display: none;}
-    .main > div {animation: fadeIn 0.5s ease-out;}
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+    .main > div {
+        animation: slideIn 0.4s ease-out;
+    }
+    @keyframes slideIn {
+        from { 
+            opacity: 0; 
+            transform: translateY(10px); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0); 
+        }
     }
     </style>
     """, unsafe_allow_html=True)

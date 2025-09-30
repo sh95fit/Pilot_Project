@@ -7,6 +7,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class RefreshTokenError(Exception):
+    """Refresh Token 관련 커스텀 예외"""
+    def __init__(self, error_type: str, message: str):
+        self.error_type = error_type  # "expired", "invalid", "server_error"
+        self.message = message
+        super().__init__(self.message)
 
 class CognitoClient:
     def __init__(
@@ -77,8 +83,16 @@ class CognitoClient:
     async def refresh_token(self, refresh_token: str) -> Optional[Dict[str, Any]]:
         """
         Refresh token으로 새 토큰 발급
+        
+        Returns:
+            성공: 새로운 토큰 딕셔너리
+            실패: None
+            
+        Raises:
+            RefreshTokenError: Refresh token 관련 명확한 에러 정보와 함께
         """
         async with self.session.client('cognito-idp', region_name=self.region_name) as client:
+            
             try:
                 auth_params = {
                     "REFRESH_TOKEN": refresh_token
@@ -96,24 +110,68 @@ class CognitoClient:
                 )
                 
                 auth_result = response.get("AuthenticationResult")
+                
                 if auth_result:
+                    # Refresh Token Rotation 여부 로깅
+                    new_refresh = auth_result.get("RefreshToken")
+                    if new_refresh:
+                        logger.info("Cognito returned new refresh token (rotation enabled)")
+                    else:
+                        logger.debug("Cognito did not return new refresh token (rotation disabled)")
+                    
                     return {
                         "access_token": auth_result.get("AccessToken"),
                         "id_token": auth_result.get("IdToken"),
-                        "refresh_token": auth_result.get("RefreshToken"),  # 새로운 refresh token (rotation 시)
+                        "refresh_token": new_refresh,  # None일 수 있음
                         "expires_in": auth_result.get("ExpiresIn"),
                         "token_type": auth_result.get("TokenType")
                     }
-                return None
+                    
+                # auth_result가 없는 경우
+                logger.error("Cognito refresh_token response missing AuthenticationResult")
+                raise RefreshTokenError(
+                    "server_error",
+                    "Invalid response from Cognito"
+                )
             
             except ClientError as e:
                 error_code = e.response['Error']['Code']
-                logger.error(f"Cognito token refresh error: {error_code} - {e}")
+                error_message = e.response['Error'].get('Message', str(e))
                 
-                if error_code in ['NotAuthorizedException', 'InvalidParameterException']:
-                    return None
+                logger.error(f"Cognito token refresh error: {error_code} - {error_message}")
+                
+                # 명확한 에러 타입 구분
+                if error_code == 'NotAuthorizedException':
+                    # Refresh Token 만료 또는 무효화
+                    if 'Refresh Token has expired' in error_message or 'Invalid Refresh Token' in error_message:
+                        raise RefreshTokenError(
+                            "expired",
+                            "Refresh token has expired"
+                        )
+                    else:
+                        raise RefreshTokenError(
+                            "invalid",
+                            f"Refresh token is invalid: {error_message}"
+                        )
+                
+                elif error_code == 'InvalidParameterException':
+                    raise RefreshTokenError(
+                        "invalid",
+                        f"Invalid refresh token parameter: {error_message}"
+                    )
+                
+                elif error_code == 'UserNotFoundException':
+                    raise RefreshTokenError(
+                        "invalid",
+                        "User not found"
+                    )
+                
                 else:
-                    raise e
+                    # 기타 서버 오류
+                    raise RefreshTokenError(
+                        "server_error",
+                        f"Cognito error ({error_code}): {error_message}"
+                    )
         
     async def get_user_info(self, access_token: str) -> Optional[Dict[str, Any]]:
         """

@@ -186,9 +186,10 @@ async def refresh(
             
             return TokenRefreshResponse(**refresh_response)
         else:
+            # 실패 시 HTTP 401 반환 (Refresh Token 만료)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Failed to refresh tokens"
+                detail="Refresh token expired or invalid"
             )
             
     except HTTPException:

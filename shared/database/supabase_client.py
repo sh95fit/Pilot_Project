@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any, List
 import os
 from shared.models.user import User, UserCreate
 from shared.models.session import UserSession, SessionCreate
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -100,15 +100,11 @@ class SupabaseClient:
     # Session 처리 메서드
     async def create_session(self, session_data: SessionCreate) -> Optional[UserSession]:        
         """
-        새 세션 생성
+        새 세션 생성 (순수 데이터 레이어)
+        
+        Note: 세션 정책(단일/다중)은 호출자(auth_service)에서 처리
         """
         try:
-            # 기존 유효 세션 확인
-            existing_session = await self.get_active_session(session_data.user_id)
-            if existing_session:
-                # 기존 세션이 있으면 무효화하고 새로 생성 (단일 세션 정책)
-                await self.revoke_session(existing_session.session_id)
-            
             # 신규 세션 생성을 위한 데이터 준비
             session_dict = session_data.model_dump()
             session_dict["user_id"] = str(session_dict["user_id"])
@@ -118,6 +114,10 @@ class SupabaseClient:
             response = self.client.table("user_sessions").insert(session_dict).execute()
             
             if response.data:
+                logger.info(
+                    f"Created new session {session_dict['session_id']} "
+                    f"for user {session_dict['user_id']}"
+                )
                 return UserSession(**response.data[0])
             return None
             
@@ -153,40 +153,40 @@ class SupabaseClient:
             return False
     
     async def revoke_session(self, session_id: str) -> bool:
-        """세션 무효화"""
+        """
+        특정 세션 무효화 (논리적 삭제)
+        감사 추적을 위해 레코드는 유지하고 revoked=True로 표시
+        """ 
         try:
             response = self.client.table("user_sessions").update({
                 "revoked": True,
                 "last_used_at": datetime.utcnow().isoformat()
-            }).eq("session_id", session_id).execute()
+            }).eq("session_id", session_id).eq("revoked", False).execute()
             
-            return len(response.data) > 0
+            if len(response.data) > 0:
+                logger.info(f"Revoked session {session_id}")
+                return True
+            
+            logger.debug(f"Session {session_id} not found or already revoked")
+            return False
         except Exception as e:
             logger.error(f"Error revoking session {session_id}: {e}")
-            return False
-    
-    async def revoke_session(self, session_id: str) -> bool:
-        """
-        세션 무효화
-        """
-        try:
-            response = self.client.table("user_sessions").update({
-                "revoked": True
-            }).eq("session_id", session_id).execute()
-            return len(response.data) > 0
-        except Exception as e:
-            logger.error(f"Error revoking session: {e}")
             return False
         
     async def revoke_all_user_sessions(self, user_id: str) -> bool:
         """
-        특정 사용자의 모든 세션 무효화
+        특정 사용자의 모든 활성 세션 무효화
+        단일 세션 정책 적용 시 또는 보안 이벤트 발생 시 사용
         """
         try:
             response = self.client.table("user_sessions").update({
                 "revoked": True,
                 "last_used_at": datetime.utcnow().isoformat()
-            }).eq("user_id", user_id).execute()
+            }).eq("user_id", user_id).eq("revoked", False).execute()
+            
+            revoked_count = len(response.data) if response.data else 0
+            if revoked_count > 0:
+                logger.info(f"Revoked {revoked_count} active sessions for user {user_id}")
             
             return True
         except Exception as e:
@@ -211,10 +211,19 @@ class SupabaseClient:
         
     async def get_active_session(self, user_id: str) -> Optional[UserSession]:
         """
-        사용자의 활성 세션 조회
+        사용자의 활성 세션 조회 (만료되지 않고 revoke되지 않은 세션)
+        가장 최근 생성된 세션 반환
         """
         try:
-            response = self.client.table("user_sessions").select("*").eq("user_id", str(user_id)).eq("revoked", False).gt("refresh_expires_at", datetime.utcnow().isoformat()).execute()
+            response = self.client.table("user_sessions").select("*").eq(
+                "user_id", str(user_id)
+            ).eq(
+                "revoked", False
+            ).gt(
+                "refresh_expires_at", datetime.utcnow().isoformat()
+            ).order(
+                "created_at", desc=True
+            ).limit(1).execute()
             
             if response.data:
                 return UserSession(**response.data[0])
@@ -226,6 +235,10 @@ class SupabaseClient:
     async def get_user_sessions(self, user_id: str, active_only: bool = True) -> List[UserSession]:
         """
         사용자의 세션 목록 조회
+        
+        Args:
+            user_id: 사용자 ID
+            active_only: True면 활성 세션만, False면 모든 세션 (revoked 포함)        
         """
         try:
             query = self.client.table("user_sessions").select("*").eq("user_id", str(user_id))
@@ -243,10 +256,91 @@ class SupabaseClient:
             return []
         
     async def delete_session_permanently(self, session_id: str) -> bool:
-        """세션 물리적 삭제"""
+        """
+        세션 물리적 삭제 (영구 삭제)
+        
+        주의: 감사 추적이 불가능하므로 신중히 사용
+        사용 시나리오:
+        - 주기적 정리 작업 (30일+ 된 revoked 세션)
+        - GDPR 삭제 요청
+        - 관리자 명령
+        """
         try:
             response = self.client.table("user_sessions").delete().eq("session_id", session_id).execute()
-            return len(response.data) > 0
+            if len(response.data) > 0:
+                logger.warning(f"Permanently deleted session {session_id}")
+                return True
+            return False
         except Exception as e:
             logger.error(f"Error permanently deleting session {session_id}: {e}")
+            return False
+
+    async def get_old_revoked_sessions(self, cutoff_date: datetime) -> List[UserSession]:
+        """
+        특정 날짜 이전에 revoke된 세션 조회 (물리적 삭제용)
+        
+        Args:
+            cutoff_date: 기준 날짜 (이 날짜 이전에 revoke된 세션 반환)
+        """
+        try:
+            response = self.client.table("user_sessions").select("*").eq(
+                "revoked", True
+            ).lt(
+                "last_used_at", cutoff_date.isoformat()
+            ).execute()
+            
+            if response.data:
+                return [UserSession(**session) for session in response.data]
+            return []
+        except Exception as e:
+            logger.error(f"Error fetching old revoked sessions: {e}")
+            return []
+            
+    async def delete_old_revoked_sessions(self, days: int = 30) -> int:
+        """
+        오래된 revoked 세션 일괄 물리적 삭제
+        
+        Args:
+            days: 며칠 이전의 revoked 세션을 삭제할지 (기본 30일)
+            
+        Returns:
+            삭제된 세션 수
+        """
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            
+            response = self.client.table("user_sessions").delete().eq(
+                "revoked", True
+            ).lt(
+                "last_used_at", cutoff_date.isoformat()
+            ).execute()
+            
+            deleted_count = len(response.data) if response.data else 0
+            if deleted_count > 0:
+                logger.info(f"Permanently deleted {deleted_count} old revoked sessions (older than {days} days)")
+            
+            return deleted_count
+        except Exception as e:
+            logger.error(f"Error deleting old revoked sessions: {e}")
+            return 0
+        
+        
+    async def update_session_last_used(self, session_id: str) -> bool:
+        """
+        세션의 last_used_at 타임스탬프만 업데이트
+        Refresh Token Rotation이 없는 경우 사용
+        """
+        try:
+            response = self.client.table("user_sessions").update({
+                "last_used_at": datetime.utcnow().isoformat()
+            }).eq("session_id", session_id).execute()
+            
+            if len(response.data) > 0:
+                logger.debug(f"Updated last_used_at for session {session_id}")
+                return True
+            else:
+                logger.warning(f"Session {session_id} not found for last_used_at update")
+                return False
+        except Exception as e:
+            logger.error(f"Error updating last_used_at for {session_id}: {e}")
             return False
