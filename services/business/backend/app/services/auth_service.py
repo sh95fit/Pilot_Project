@@ -8,10 +8,10 @@ from shared.models.user import UserCreate
 from shared.models.session import SessionCreate
 from shared.auth.jwt_handler import JWTHandler
 from shared.auth.crypto import CryptoHandler
-from shared.auth.cognito_client import CognitoClient
+from shared.auth.cognito_client import CognitoClient, RefreshTokenError
 from shared.database.supabase_client import SupabaseClient
 from shared.database.redis_client import RedisClient
-from ..core.config import settings
+from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -141,34 +141,149 @@ class AuthService:
         redis_client: RedisClient, 
         supabase_client: SupabaseClient
     ) -> None:
-        """세션 정리 - 최대 세션 수 정책에 따라 처리"""
+        """
+        세션 정리 - 최대 세션 수 정책에 따라 처리
+        
+        단일 세션 정책: Redis 캐시 + DB의 기존 세션 모두 revoke
+        다중 세션 정책: 최대 세션 수 초과 시 오래된 세션 revoke        
+        """
         try:
             if not settings.allow_multiple_sessions:
-                # 단일 세션 정책: 모든 기존 세션 삭제
-                existing_sessions = await supabase_client.get_user_sessions(user_id, active_only=True)
+                # 단일 세션 정책: Redis 캐시 + DB의 기존 세션 모두 revoke
+                existing_sessions = await supabase_client.get_user_sessions(
+                    user_id, 
+                    active_only=True
+                )
+                
+                # Redis 캐시 삭제
                 for session in existing_sessions:
                     redis_client.delete_session(session.session_id)
-                    await supabase_client.delete_session_permanently(session.session_id)
                 
-                logger.info(f"User {user_id}: deleted {len(existing_sessions)} existing sessions (single session policy)")
-            
+                # DB에서 revoke
+                if existing_sessions:
+                    await supabase_client.revoke_all_user_sessions(str(user_id))
+                    logger.info(
+                        f"User {user_id}: revoked {len(existing_sessions)} existing sessions "
+                        f"(single session policy)"
+                    )
+                return
+        
+            # 다중 세션 허용: 최대 세션 수 체크
+            max_sessions = getattr(settings, 'max_sessions_per_user', 3)
+            existing_sessions = await supabase_client.get_user_sessions(
+                user_id, 
+                active_only=True
+            )
+        
+            if len(existing_sessions) >= max_sessions:
+                # 가장 오래된 세션부터 제거 (최신 세션은 유지)
+                sessions_sorted = sorted(
+                    existing_sessions, 
+                    key=lambda x: x.created_at
+                )
+                
+                # 새 세션 1개를 위한 공간 확보
+                num_to_revoke = len(existing_sessions) - max_sessions + 1
+                sessions_to_revoke = sessions_sorted[:num_to_revoke]
+                
+                for session in sessions_to_revoke:
+                    # Redis 캐시 삭제
+                    redis_client.delete_session(session.session_id)
+                    # DB에서 revoke
+                    await supabase_client.revoke_session(session.session_id)
+                
+                logger.info(
+                    f"User {user_id}: revoked {len(sessions_to_revoke)} "
+                    f"old sessions to maintain max {max_sessions} sessions"
+                )
             else:
-                # 다중 세션 허용: 최대 세션 수 체크
-                max_sessions = getattr(settings, 'max_sessions_per_user', 3)
-                existing_sessions = await supabase_client.get_user_sessions(user_id, active_only=True)
-                
-                if len(existing_sessions) >= max_sessions:
-                    # 세션 수가 최대치에 도달했으면 오래된 세션부터 삭제
-                    sessions_to_delete = sorted(existing_sessions, key=lambda x: x.created_at)[:-max_sessions+1]
+                logger.debug(
+                    f"User {user_id}: {len(existing_sessions)}/{max_sessions} "
+                    f"sessions - no cleanup needed"
+                )
                     
-                    for session in sessions_to_delete:
-                        redis_client.delete_session(session.session_id)
-                        await supabase_client.delete_session_permanently(session.session_id)
-                    
-                    logger.info(f"User {user_id}: deleted {len(sessions_to_delete)} old sessions (max sessions: {max_sessions})")
-                
         except Exception as e:
-            logger.warning(f"Failed to cleanup existing sessions for user {user_id}: {e}")
+            logger.warning(
+                f"Failed to cleanup existing sessions for user {user_id}: {e}"
+            )
+                   
+                # existing_sessions = await supabase_client.get_user_sessions(
+                #     user_id, 
+                #     active_only=True
+                # )
+                
+                # for session in existing_sessions:
+                #     redis_client.delete_session(session.session_id)
+                
+                # if existing_sessions:
+                #     logger.info(
+                #         f"User {user_id}: cleared {len(existing_sessions)} "
+                #         f"Redis session caches (single session policy)"
+                #     )
+                    
+            # else:
+            #     # 다중 세션 허용: 최대 세션 수 체크
+            #     max_sessions = getattr(settings, 'max_sessions_per_user', 3)
+            #     existing_sessions = await supabase_client.get_user_sessions(
+            #         user_id, 
+            #         active_only=True
+            #     )
+                
+            #     if len(existing_sessions) >= max_sessions:
+            #         # 가장 오래된 세션부터 제거 (최신 세션은 유지)
+            #         sessions_sorted = sorted(
+            #             existing_sessions, 
+            #             key=lambda x: x.created_at
+            #         )
+                    
+            #         # 삭제할 개수 계산
+            #         num_to_revoke = len(existing_sessions) - max_sessions + 1
+            #         sessions_to_revoke = sessions_sorted[:num_to_revoke]
+                    
+            #         for session in sessions_to_revoke:
+            #             # Redis 캐시 삭제
+            #             redis_client.delete_session(session.session_id)
+            #             # DB에서 revoke (삭제 아님)
+            #             await supabase_client.revoke_session(session.session_id)
+                    
+            #         logger.info(
+            #             f"User {user_id}: revoked {len(sessions_to_revoke)} "
+            #             f"old sessions (max sessions: {max_sessions})"
+            #         )
+                
+        # except Exception as e:
+        #     logger.warning(
+        #         f"Failed to cleanup existing sessions for user {user_id}: {e}"
+        #     )
+                
+        
+        # try:
+        #     if not settings.allow_multiple_sessions:
+        #         # 단일 세션 정책: 모든 기존 세션 삭제
+        #         existing_sessions = await supabase_client.get_user_sessions(user_id, active_only=True)
+        #         for session in existing_sessions:
+        #             redis_client.delete_session(session.session_id)
+        #             await supabase_client.delete_session_permanently(session.session_id)
+                
+        #         logger.info(f"User {user_id}: deleted {len(existing_sessions)} existing sessions (single session policy)")
+            
+        #     else:
+        #         # 다중 세션 허용: 최대 세션 수 체크
+        #         max_sessions = getattr(settings, 'max_sessions_per_user', 3)
+        #         existing_sessions = await supabase_client.get_user_sessions(user_id, active_only=True)
+                
+        #         if len(existing_sessions) >= max_sessions:
+        #             # 세션 수가 최대치에 도달했으면 오래된 세션부터 삭제
+        #             sessions_to_delete = sorted(existing_sessions, key=lambda x: x.created_at)[:-max_sessions+1]
+                    
+        #             for session in sessions_to_delete:
+        #                 redis_client.delete_session(session.session_id)
+        #                 await supabase_client.delete_session_permanently(session.session_id)
+                    
+        #             logger.info(f"User {user_id}: deleted {len(sessions_to_delete)} old sessions (max sessions: {max_sessions})")
+                
+        # except Exception as e:
+        #     logger.warning(f"Failed to cleanup existing sessions for user {user_id}: {e}")
     
     @staticmethod
     def _extract_device_info(request: Request) -> Dict[str, str]:
@@ -273,8 +388,25 @@ class AuthService:
                 
             # 3. Refresh token 복호화 및 갱신
             refresh_token = crypto_handler.decrypt(session_data["refresh_token_enc"])
-            new_tokens = await cognito_client.refresh_token(refresh_token)
             
+            try:
+                new_tokens = await cognito_client.refresh_token(refresh_token)
+                
+            except RefreshTokenError as e:
+                # Refresh Token 관련 명확한 에러 처리
+                logger.error(
+                    f"Session {session_id} refresh token error: "
+                    f"type={e.error_type}, message={e.message}"
+                )
+                
+                # Refresh Token 만료 또는 무효화 시 세션 무효화
+                if e.error_type in ["expired", "invalid"]:
+                    await AuthService._invalidate_session(
+                        session_id, response, redis_client, supabase_client
+                    )
+                
+                return False, None
+   
             if not new_tokens:
                 logger.warning(f"Session {session_id} token could not be refreshed")
                 await AuthService._invalidate_session(session_id, response, redis_client, supabase_client)
@@ -287,6 +419,11 @@ class AuthService:
                     supabase_client, redis_client, session_data
                 )
             
+            else:
+                # ✅ Rotation이 없어도 last_used_at 갱신
+                await supabase_client.update_session_last_used(session_id)
+                logger.debug(f"Session {session_id}: refresh token not rotated, updated last_used_at only") 
+                       
             # 5. 새 Access token 발급 및 쿠키 설정
             new_access_token = await AuthService._issue_new_access_token(
                 session_data, session_id, jwt_handler, response, supabase_client
@@ -302,10 +439,12 @@ class AuthService:
             logger.info(f"Session {session_id} token refresh successful")
             return True, token_info
         
+        
         except Exception as e:
-            print(f"Token refresh error: {e}")
+            logger.error(f"Token refresh error: {e}", exc_info=True)
             return False, None
-    
+        
+        
     @staticmethod
     async def _get_session_data(
         session_id: str, 
@@ -599,3 +738,4 @@ class AuthService:
         except Exception as e:
             logger.error(f"Session {session_id} logout error: {e}", exc_info=True)
             return {"success": False, "message": "logout failed"}
+        

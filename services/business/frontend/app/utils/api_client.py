@@ -83,10 +83,17 @@ class APIClient:
         현재 사용자 정보 조회 - /auth/me API 호출 (새로 추가)
         """
         try:
-            # 기존 쿠키 방식 사용
-            headers = {
-                'cookie': f'access_token={access_token}'
-            }
+            # 쿠키 헤더에 access_token만 보내면 서버가 세션 조회 시 누락될 수 있어
+            # session_id도 함께 보낸다
+            session_id = st.session_state.get('session_id')
+            if session_id:
+                headers = {
+                    'cookie': f'access_token={access_token}; session_id={session_id}'
+                }
+            else:
+                headers = {
+                    'cookie': f'access_token={access_token}'
+                }
             
             response = self.session.get(
                 f"{self.base_url}/auth/me",
@@ -114,15 +121,26 @@ class APIClient:
             return {"success": False, "message": "사용자 정보 조회 중 오류 발생"}    
     
     
-    def refresh_token(self, access_token: str, session_id: str) -> Optional[Dict[str, Any]]:
+    # def refresh_token(self, access_token: str, session_id: str) -> Optional[Dict[str, Any]]:
+    def refresh_token(self, session_id: str) -> Optional[Dict[str, Any]]:
         """
         토큰 갱신 API 호출
+        
+        Args:
+            session_id: 세션 ID (쿠키로 전송)
+        
+        Returns:
+            성공: {"success": True, "message": "...", "tokens": {...}}
+            실패: {"success": False, "message": "..."}        
         """
         try:
             # Cookie 헤더로 전송 (Streamlit -> Fastapi)
             headers = {
-                'cookie': f"access_token={access_token}; session_id={session_id}"
+                # 'cookie': f"access_token={access_token}; session_id={session_id}"
+                'cookie': f"session_id={session_id}"
             }
+            
+            logger.debug(f"Token refresh request for session: {session_id[:8]}...")
             
             response = self.session.post(
                 f"{self.base_url}/auth/refresh",
@@ -131,13 +149,23 @@ class APIClient:
             )
             
             result = self._handle_response(response, "token refresh")
-            
-            if result and response.status_code == 200:
-                logger.debug("Token refresh successful")
-                return result
+
+            if result:
+                result['status_code'] = response.status_code  # ← 추가
             else:
-                logger.warning(f"Token refresh failed: {response.status_code}")
-                return result
+                # result가 None인 경우에도 status_code 포함
+                result = {
+                    'success': False,
+                    'status_code': response.status_code,
+                    'message': 'No response data'
+                }            
+                
+            if result and result.get('success'):
+                logger.debug("Token refresh successful")
+            else:
+                logger.warning(f"Token refresh failed: {result.get('message') if result else 'no response'}")
+            
+            return result
         
         except requests.exceptions.Timeout:
             logger.error("Token refresh request timeout")

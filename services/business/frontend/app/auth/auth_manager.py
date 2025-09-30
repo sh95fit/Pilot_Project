@@ -173,22 +173,63 @@ class AuthManager:
                 refresh_type = "expired" if token_expired else "threshold reached"
                 logger.debug(f"Token {refresh_type}, attempting refresh")
                 
-                refresh_success = self._refresh_token(access_token, session_id)
+                refresh_success, refresh_reason = self._refresh_token(access_token, session_id)
                 
                 if refresh_success:
                     # ✅ 갱신된 토큰 다시 가져오기
                     access_token, session_id = self.session_manager.get_auth_tokens()
                     logger.info(f"Token refreshed successfully ({refresh_type})")
+                    
+                    # ✅ 갱신 성공 시 실패 카운터 초기화
+                    if 'refresh_fail_count' in st.session_state:
+                        del st.session_state['refresh_fail_count']
                 else:
-                    logger.warning(f"Token refresh failed ({refresh_type})")
+                    logger.warning(f"Token refresh failed ({refresh_type}): {refresh_reason}")
+                    
+                    # Refresh Token 만료 시 즉시 로그아웃
+                    if refresh_reason == "refresh_token_expired":
+                        logger.error("Refresh Token expired - immediate logout required")
+                        self._clear_auth_state()
+                        # 사용자에게 알림
+                        st.session_state['logout_reason'] = "세션이 만료되었습니다. 다시 로그인해주세요."
+                        return False, None
+                    
                     # 토큰이 완전히 만료된 경우에만 인증 상태 삭제
                     if token_expired:
                         logger.error("Token expired and refresh failed - clearing auth state")
                         self._clear_auth_state()
                         return False, None
+                    
+                    # ✅ needs_refresh인 경우도 refresh 실패 시 재시도 제한
+                    # 연속 실패 카운트 추가
+                    refresh_fail_count = st.session_state.get('refresh_fail_count', 0) + 1
+                    st.session_state['refresh_fail_count'] = refresh_fail_count
+                    
+                    logger.warning(
+                        f"Token refresh failed {refresh_fail_count} time(s) - "
+                        f"possible refresh token expiration"
+                    )
+                    
+                    if refresh_fail_count >= 3:
+                        # 2회 연속 실패 시 로그아웃 (Refresh Token 만료로 판단)
+                        logger.error(
+                            f"Token refresh failed {refresh_fail_count} times - "
+                            f"clearing auth state"
+                        )
+                        self._clear_auth_state()
+                        st.session_state['logout_reason'] = "토큰 갱신에 반복적으로 실패했습니다. 다시 로그인해주세요."
+                        return False, None
                     else:
-                        # 임계점 갱신 실패는 다음에 재시도 (현재 토큰으로 계속 진행)
-                        logger.warning("Threshold refresh failed but token still valid - continuing")             
+                        # 1회 실패는 경고만 (다음 체크에서 재시도)
+                        logger.warning(
+                            f"Token refresh failed ({refresh_fail_count}/2) - "
+                            f"will retry on next check" 
+                        )     
+                        
+            else:
+                # ✅ 갱신 불필요 시 카운터 초기화
+                if 'refresh_fail_count' in st.session_state:
+                    del st.session_state['refresh_fail_count']
 
             # 5. 서버에서 인증 상태 최종 확인 (기존 유지)
             auth_result = self.api_client.check_auth(access_token, session_id)
@@ -260,18 +301,43 @@ class AuthManager:
         """
         토큰 갱신 - 동기화 처리 포함
         
+        Args:
+            access_token: 현재(만료된) access_token - 로깅/검증용
+            session_id: 세션 ID - 실제 갱신에 사용
+        
         Returns:
-            bool: 갱신 성공 여부
+            Tuple[bool, str]: (성공 여부, 실패 사유)
+            실패 사유: "refresh_token_expired", "network_error", "server_error", "sync_failed"
         """
         try:
             logger.debug("Attempting token refresh")
             
-            result = self.api_client.refresh_token(access_token, session_id)
+            # result = self.api_client.refresh_token(access_token, session_id)
+            
+            # ✅ session_id만 전달
+            result = self.api_client.refresh_token(session_id)
+            
+            if not result:
+                return False, "network_error"
+            
+            status_code = result.get('status_code', 0)
+                
+            # HTTP 401 = Refresh Token 만료 (즉시 로그아웃 필요)
+            if status_code == 401:
+                logger.error("Refresh Token expired (HTTP 401)")
+                return False, "refresh_token_expired"    
                 
             # result가 None이거나 success가 False인 경우
-            if not result or not result.get('success'):
-                logger.warning("Token refresh API call failed")
-                return False
+            if not result.get('success'):
+                error_msg = result.get('message', 'Unknown error')
+                
+                if status_code >= 500:
+                    logger.warning(f"Token refresh server error: {error_msg} (HTTP {status_code})")
+                    return False, "server_error"
+                else:
+                    logger.warning(f"Token refresh failed: {error_msg} (HTTP {status_code})")
+                    return False, "server_error"
+
 
             # # 새로운 토큰 정보가 있으면 업데이트
             # tokens = result.get('tokens')
@@ -300,7 +366,6 @@ class AuthManager:
         
 
             # ✅ tokens는 result의 두 번째 값 (Tuple 반환 구조)
-            # API client가 (success, tokens) 형태로 반환한다고 가정
             tokens = result.get('tokens')
 
             # tokens가 None인 경우 갱신 실패
@@ -313,8 +378,20 @@ class AuthManager:
             expires_in = tokens.get('expires_in', 3600)
             
             if not new_access_token or not new_session_id:
-                logger.warning(f"Invalid tokens in refresh response: access_token={bool(new_access_token)}, session_id={bool(new_session_id)}")
-                return False
+                logger.warning(
+                    f"Invalid tokens in refresh response: "
+                    f"access_token={bool(new_access_token)}, "
+                    f"session_id={bool(new_session_id)}"
+                )
+                return False, "server_error"
+            
+            # 세션 ID 변경 확인
+            if new_session_id != session_id:
+                logger.info(
+                    f"Session ID changed during refresh: "
+                    f"{session_id[:8]}... -> {new_session_id[:8]}..."
+                )
+            
             
             # ✅ 새로운 토큰으로 업데이트 (동기화 포함)
             expires_minutes = expires_in // 60
@@ -324,20 +401,28 @@ class AuthManager:
                 expires_minutes
             )
             
-            if update_success:
-                logger.info("Token refresh and sync completed successfully")
-                
-                # 디버깅: 동기화 상태 확인
-                sync_status = self.session_manager.get_sync_status()
-                logger.debug(f"Post-refresh sync status: {sync_status}")
-                
-                return True
-            else:
+            if not update_success:
                 logger.error("Token refresh succeeded but sync failed")
-                return False
+                return False, "sync_failed"
+            
+            logger.info("Token refresh and sync completed successfully")
+                
+            # ✅ 세션 상태 업데이트 (변경된 경우)
+            if new_session_id != session_id:
+                st.session_state['session_id'] = new_session_id
+                logger.debug(f"Updated session_state with new session_id")
+            
+            # 디버깅: 동기화 상태 확인
+            sync_status = self.session_manager.get_sync_status()
+            logger.debug(f"Post-refresh sync status: {sync_status}")
+
+            # 갱신 시간 기록
+            st.session_state.last_token_refresh = time.time()
+            
+            return True, "success"
 
         except Exception as e:
-            logger.error(f"Token refresh error: {e}")
+            logger.error(f"Token refresh error: {e}", exc_info=True)
             return False
         
     def get_user_info(self) -> Optional[Dict[str, Any]]:
