@@ -115,9 +115,9 @@ class Settings(BaseSettings):
     allow_multiple_sessions: bool = False
     max_sessions_per_user: int = 3
  
-    # Refresh Token 설정
-    refresh_token_rotation_threshold_seconds: int = 86400  # 1일 이내 만료 시 Cognito rotation
-    token_refresh_threshold_minutes: int = 5  # Access Token 5분 이내 만료 시 갱신
+    # # Refresh Token 설정
+    refresh_token_renewal_threshold_days: int = 1  # Refresh Token 갱신 임계값 추가 (1일 이내 만료 시)
+    cognito_refresh_token_expire_days: int = 30 # Cognito Refresh Token 만료 기간
     
     # RSA 키
 
