@@ -39,7 +39,7 @@ class Settings:
     
     # 세션 설정
     SESSION_TIMEOUT_MINUTES: int = int(os.getenv("SESSION_TIMEOUT_MINUTES", "30"))  # 사용자 비활성 상태에서 자동 로그아웃 시간 설정
-    TOKEN_REFRESH_THRESHOLD_MINUTES: int = int(os.getenv("TOKEN_REFRESH_THRESHOLD_MINUTES", "3"))   # JWT 토큰 만료 5분 전 access token 갱신 처리
+    TOKEN_REFRESH_THRESHOLD_MINUTES: int = int(os.getenv("TOKEN_REFRESH_THRESHOLD_MINUTES", "5"))   # JWT 토큰 만료 5분 전 access token 갱신 처리
 
     # FastAPI 백엔드 설정
     BACKEND_URL: str = os.getenv("BACKEND_URL", "http://backend:8000")
