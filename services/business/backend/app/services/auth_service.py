@@ -48,8 +48,14 @@ class AuthService:
         로그인 처리 (Device Tracking 비활성화)
         """
         try:
+            # 기존 세션에서 device_key 조회 (재로그인 시 활용)
+            existing_device_key = await AuthService._get_user_device_key(
+                email, supabase_client
+            )
+            
             # 1. Cognito 인증
-            cognito_tokens = await cognito_client.authenticate_user(email, password)
+            cognito_tokens = await cognito_client.authenticate_user(email, password, device_key=existing_device_key)
+            
             if not cognito_tokens:
                 raise HTTPException(status_code=401, detail="Invalid credentials")
             
@@ -67,6 +73,7 @@ class AuthService:
             )
             
             user = await supabase_client.upsert_user(user_create_data)
+            
             if not user:
                 raise HTTPException(status_code = 500, detail="Failed to create/update user")
             
@@ -86,6 +93,11 @@ class AuthService:
             
             # 디바이스 정보 수집
             device_info = AuthService._extract_device_info(request)
+
+            # Device Key 추출
+            device_key = cognito_tokens.get('device_key')
+            device_group_key = cognito_tokens.get('device_group_key')
+            
             
             session_create_data = SessionCreate(
                 user_id=user.id,
@@ -93,6 +105,8 @@ class AuthService:
                 refresh_token_enc=encrypted_refresh_token,
                 refresh_expires_at=refresh_expires_at,
                 device_info=device_info, 
+                device_key=device_key,  
+                device_group_key=device_group_key  
             )
                 
             # 7. 세션 저장 (DB 및 Redis)
@@ -112,7 +126,8 @@ class AuthService:
             AuthService._set_auth_cookies(response, access_token, session_id, refresh_expires_at)
             
             logger.info(
-                f"Login successful: user={email}, session={session_id}"
+                f"Login successful: user={email}, session={session_id}, "
+                f"device_key={'Yes' if device_key else 'No'}"
             )
             
             return {
@@ -137,6 +152,40 @@ class AuthService:
         except Exception as e:
             logger.error(f"{email} login error: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Internal server error")
+
+
+    @staticmethod
+    async def _get_user_device_key(
+        email: str,
+        supabase_client
+    ) -> Optional[str]:
+        """사용자의 가장 최근 device_key 조회"""
+        try:
+            # 이메일로 사용자 조회
+            user = await supabase_client.get_user_by_email(email)
+            if not user:
+                return None
+            
+            # 가장 최근 활성 세션의 device_key 조회
+            sessions = await supabase_client.get_user_sessions(
+                user.id, 
+                active_only=True
+            )
+            
+            if sessions:
+                # 가장 최근 세션 (last_used_at 기준)
+                latest_session = max(sessions, key=lambda s: s.last_used_at)
+                device_key = getattr(latest_session, 'device_key', None)
+                
+                if device_key:
+                    logger.debug(f"Found existing device_key for {email}: {device_key[:20]}...")
+                    return device_key
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Failed to get device_key for {email}: {e}")
+            return None
     
     
     @staticmethod
@@ -247,6 +296,13 @@ class AuthService:
             "refresh_token_enc": session_data.refresh_token_enc,
             "refresh_expires_at": refresh_expires_at.isoformat(),
         }
+        
+        # Device Key 추가
+        if session_data.device_key:
+            redis_session_data["device_key"] = session_data.device_key
+        if session_data.device_group_key:
+            redis_session_data["device_group_key"] = session_data.device_group_key
+        
         ttl_seconds = int((refresh_expires_at - datetime.utcnow()).total_seconds())
         
         if not redis_client.set_session(session_data.session_id, redis_session_data, ttl_seconds):
@@ -341,13 +397,19 @@ class AuthService:
                 logger.info(
                     f"Session {session_id[:8]}... refresh token expiring soon, "
                     f"requesting new refresh token from Cognito"
-                )
+                )            
                 
                 # Cognito를 통한 Refresh Token 갱신
                 refresh_token = crypto_handler.decrypt(session_data["refresh_token_enc"])
                 
+                # device_key 포함 갱신
+                device_key = session_data.get("device_key")    
+                
                 try:
-                    new_tokens = await cognito_client.refresh_token(refresh_token)
+                    new_tokens = await cognito_client.refresh_token(
+                        refresh_token,
+                        device_key=device_key
+                    )
                     
                 except RefreshTokenError as e:
                     logger.error(
@@ -442,6 +504,12 @@ class AuthService:
             "refresh_token_enc": db_session.refresh_token_enc,
             "refresh_expires_at": db_session.refresh_expires_at.isoformat(),
         }
+
+        # Device Key 추가
+        if hasattr(db_session, 'device_key') and db_session.device_key:
+            session_data["device_key"] = db_session.device_key
+        if hasattr(db_session, 'device_group_key') and db_session.device_group_key:
+            session_data["device_group_key"] = db_session.device_group_key
         
         ttl_seconds = int((db_session.refresh_expires_at - datetime.utcnow()).total_seconds())
         if ttl_seconds > 0:

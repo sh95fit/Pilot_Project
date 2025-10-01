@@ -5,7 +5,8 @@ from typing import Dict, Any, Optional
 import json
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
+
 
 class RefreshTokenError(Exception):
     """Refresh Token 관련 커스텀 예외"""
@@ -33,10 +34,11 @@ class CognitoClient:
     async def authenticate_user(
         self, 
         email: str, 
-        password: str
+        password: str,
+        device_key: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        사용자 인증 (USER_PASSWORD_AUTH + Device Tracking 비활성화화)
+        사용자 인증 (USER_PASSWORD_AUTH + Device Tracking 지원)
         """
         async with self.session.client('cognito-idp', region_name=self.region_name) as client:
             try:
@@ -45,6 +47,12 @@ class CognitoClient:
                     "PASSWORD": password
                 }
                 
+                # Device Key가 있으면 추가 (재로그인 시)
+                if device_key:
+                    auth_params["DEVICE_KEY"] = device_key
+                    logger.info(f"🔑 Using existing device_key: {device_key[:20]}...")
+                
+                
                 response = await client.initiate_auth(
                     ClientId=self.client_id,
                     AuthFlow="USER_PASSWORD_AUTH",
@@ -52,6 +60,11 @@ class CognitoClient:
                 )
                 
                 auth_result = response.get("AuthenticationResult")
+                 
+                # device_metadata = response.get('NewDeviceMetadata', {})
+                # device_key = device_metadata.get('DeviceKey')
+                
+                # logger.warning(f"Cognito raw response for {email}: {response}")
                     
                 if not auth_result:
                     logger.error(f"Authentication failed for {email}: No AuthenticationResult")
@@ -64,15 +77,46 @@ class CognitoClient:
                     logger.error(f"Missing tokens for {email}")
                     return None
                 
-                logger.info(f"Authentication successful for {email}")
-                
-                return {
-                    "access_token": access_token,
+                tokens = {
+                    "access_token": auth_result.get("AccessToken"),
                     "id_token": auth_result.get("IdToken"),
-                    "refresh_token": refresh_token,
+                    "refresh_token": auth_result.get("RefreshToken"),
                     "expires_in": auth_result.get("ExpiresIn", 3600),
                     "token_type": auth_result.get("TokenType", "Bearer")
-                }
+                }                
+                
+                # 새 디바이스 메타데이터 처리
+                device_metadata = auth_result.get('NewDeviceMetadata', {})
+                
+                # print(f"🔍 Response type: {type(response)}")
+                # print(f"🔍 Full response keys: {list(response.keys())}")
+                # print(f"{response}")
+                # print(f"🔍 NewDeviceMetadata: {device_metadata}")
+                # print(f"🔍 NewDeviceMetadata type: {type(device_metadata)}")
+                # print(f"🔍 NewDeviceMetadata bool: {bool(device_metadata)}")
+                
+                if device_metadata:
+                    tokens['device_key'] = device_metadata.get('DeviceKey')
+                    tokens['device_group_key'] = device_metadata.get('DeviceGroupKey')
+                    logger.info(
+                        f"New device registered for {email}: "
+                        f"device_key={tokens['device_key'][:20] if tokens.get('device_key') else 'None'}..."
+                    )
+                elif device_key:
+                    # 기존 디바이스로 로그인 성공
+                    tokens['device_key'] = device_key
+                    logger.debug(f"Authenticated with existing device_key: {device_key[:20]}...")
+                                    
+                logger.info(f"Authentication successful for {email}")
+                
+                return tokens
+                # return {
+                #     "access_token": access_token,
+                #     "id_token": auth_result.get("IdToken"),
+                #     "refresh_token": refresh_token,
+                #     "expires_in": auth_result.get("ExpiresIn", 3600),
+                #     "token_type": auth_result.get("TokenType", "Bearer")
+                # }
             
             except ClientError as e:
                 error_code = e.response['Error']['Code']
@@ -90,7 +134,7 @@ class CognitoClient:
         
     async def refresh_token(self, refresh_token: str, device_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
-        Refresh token으로 새 토큰 발급
+        Refresh token으로 새 토큰 발급 (Device Key 포함)
         """
         async with self.session.client('cognito-idp', region_name=self.region_name) as client:
             try:
@@ -101,6 +145,11 @@ class CognitoClient:
                 # Client Secret이 있는 경우 SECRET_HASH 추가 (refresh token에서는 username 대신 client_id 사용)
                 # if self.client_secret:
                 #     auth_params["SECRET_HASH"] = self._calculate_secret_hash_for_refresh(refresh_token)
+                
+                # Device Key 추가
+                if device_key:
+                    auth_params["DEVICE_KEY"] = device_key
+                    logger.debug(f"Refreshing with device_key: {device_key[:20]}...")                
                 
                 response = await client.initiate_auth(
                     ClientId=self.client_id,
@@ -113,24 +162,39 @@ class CognitoClient:
                 if not auth_result:
                     raise RefreshTokenError("server_error", "Invalid response from Cognito")
                 
+                tokens = {
+                    "access_token": auth_result.get("AccessToken"),
+                    "id_token": auth_result.get("IdToken"),
+                    "expires_in": auth_result.get("ExpiresIn", 3600),
+                    "token_type": auth_result.get("TokenType", "Bearer")
+                }                             
+                
                 new_refresh = auth_result.get("RefreshToken")
 
                 if new_refresh:
+                    tokens["refresh_token"] = new_refresh
                     logger.debug("New refresh token received (rotation enabled)")
                 else:
                     logger.debug("No new refresh token (rotation disabled)")
 
+                    
                 access_token = auth_result.get("AccessToken")
                 if not access_token:
                     raise RefreshTokenError("server_error", "No access token received")
+
+                # Device Key 유지
+                if device_key:
+                    tokens['device_key'] = device_key
                 
-                return {
-                    "access_token": access_token,
-                    "id_token": auth_result.get("IdToken"),
-                    "refresh_token": new_refresh,  
-                    "expires_in": auth_result.get("ExpiresIn", 3600),
-                    "token_type": auth_result.get("TokenType", "Bearer")
-                }
+                return tokens
+            
+                # return {
+                #     "access_token": access_token,
+                #     "id_token": auth_result.get("IdToken"),
+                #     "refresh_token": new_refresh,  
+                #     "expires_in": auth_result.get("ExpiresIn", 3600),
+                #     "token_type": auth_result.get("TokenType", "Bearer")
+                # }
                     
             except ClientError as e:
                 error_code = e.response['Error']['Code']
