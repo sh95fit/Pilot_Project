@@ -41,95 +41,126 @@ class CognitoClient:
         사용자 인증 (USER_PASSWORD_AUTH + Device Tracking 지원)
         """
         async with self.session.client('cognito-idp', region_name=self.region_name) as client:
+            auth_params = {
+                "USERNAME": email,
+                "PASSWORD": password
+            }
+                
+            # Device Key가 있으면 추가 (재로그인 시)
+            if device_key:
+                auth_params["DEVICE_KEY"] = device_key
+                logger.info(f"🔑 Using existing device_key: {device_key[:20]}...")
+                
             try:
-                auth_params = {
-                    "USERNAME": email,
-                    "PASSWORD": password
-                }
-                
-                # Device Key가 있으면 추가 (재로그인 시)
-                if device_key:
-                    auth_params["DEVICE_KEY"] = device_key
-                    logger.info(f"🔑 Using existing device_key: {device_key[:20]}...")
-                
-                
                 response = await client.initiate_auth(
                     ClientId=self.client_id,
                     AuthFlow="USER_PASSWORD_AUTH",
                     AuthParameters=auth_params
                 )
-                
-                auth_result = response.get("AuthenticationResult")
-                 
-                # device_metadata = response.get('NewDeviceMetadata', {})
-                # device_key = device_metadata.get('DeviceKey')
-                
-                # logger.warning(f"Cognito raw response for {email}: {response}")
-                    
-                if not auth_result:
-                    logger.error(f"Authentication failed for {email}: No AuthenticationResult")
-                    return None
-                    
-                access_token = auth_result.get("AccessToken")
-                refresh_token = auth_result.get("RefreshToken")
-                
-                if not access_token or not refresh_token:
-                    logger.error(f"Missing tokens for {email}")
-                    return None
-                
-                tokens = {
-                    "access_token": auth_result.get("AccessToken"),
-                    "id_token": auth_result.get("IdToken"),
-                    "refresh_token": auth_result.get("RefreshToken"),
-                    "expires_in": auth_result.get("ExpiresIn", 3600),
-                    "token_type": auth_result.get("TokenType", "Bearer")
-                }                
-                
-                # 새 디바이스 메타데이터 처리
-                device_metadata = auth_result.get('NewDeviceMetadata', {})
-                
-                # print(f"🔍 Response type: {type(response)}")
-                # print(f"🔍 Full response keys: {list(response.keys())}")
-                # print(f"{response}")
-                # print(f"🔍 NewDeviceMetadata: {device_metadata}")
-                # print(f"🔍 NewDeviceMetadata type: {type(device_metadata)}")
-                # print(f"🔍 NewDeviceMetadata bool: {bool(device_metadata)}")
-                
-                if device_metadata:
-                    tokens['device_key'] = device_metadata.get('DeviceKey')
-                    tokens['device_group_key'] = device_metadata.get('DeviceGroupKey')
-                    logger.info(
-                        f"New device registered for {email}: "
-                        f"device_key={tokens['device_key'][:20] if tokens.get('device_key') else 'None'}..."
-                    )
-                elif device_key:
-                    # 기존 디바이스로 로그인 성공
-                    tokens['device_key'] = device_key
-                    logger.debug(f"Authenticated with existing device_key: {device_key[:20]}...")
-                                    
-                logger.info(f"Authentication successful for {email}")
-                
-                return tokens
-                # return {
-                #     "access_token": access_token,
-                #     "id_token": auth_result.get("IdToken"),
-                #     "refresh_token": refresh_token,
-                #     "expires_in": auth_result.get("ExpiresIn", 3600),
-                #     "token_type": auth_result.get("TokenType", "Bearer")
-                # }
-            
+
             except ClientError as e:
                 error_code = e.response['Error']['Code']
-                logger.error(f"Cognito authentication error: {error_code} - {e}")
-                
-                if error_code in ['NotAuthorizedException', 'UserNotFoundException']:
+                logger.warning(f"Login failed for {email} with error: {error_code}")
+
+                # ✅ device_key가 더 이상 유효하지 않을 때 재시도
+                if error_code == "ResourceNotFoundException" and device_key:
+                    logger.warning(
+                        f"Device key not found for {email}. Retrying without device_key..."
+                    )
+
+                    # 기존 device_key 제거 후 재시도
+                    auth_params.pop("DEVICE_KEY", None)
+
+                    try:
+                        response = await client.initiate_auth(
+                            ClientId=self.client_id,
+                            AuthFlow="USER_PASSWORD_AUTH",
+                            AuthParameters=auth_params
+                        )
+                        logger.info(f"Login successful for {email} after device_key removal")
+                    
+                    except ClientError as retry_error:
+                        # 재시도도 실패한 경우
+                        retry_error_code = retry_error.response['Error']['Code']
+                        logger.error(
+                            f"Retry login failed for {email}: {retry_error_code}"
+                        )
+                        
+                        if retry_error_code in ["NotAuthorizedException", "UserNotFoundException"]:
+                            return None
+                        elif retry_error_code == "PasswordResetRequiredException":
+                            raise ValueError("Password reset required")
+                        elif retry_error_code == "UserNotConfirmedException":
+                            raise ValueError("User email not confirmed")
+                        else:
+                            raise retry_error
+
+                # 그 외 일반적인 인증 실패
+                elif error_code in ["NotAuthorizedException", "UserNotFoundException"]:
                     return None
-                elif error_code == 'PasswordResetRequiredException':
+                elif error_code == "PasswordResetRequiredException":
                     raise ValueError("Password reset required")
-                elif error_code == 'UserNotConfirmedException':
+                elif error_code == "UserNotConfirmedException":
                     raise ValueError("User email not confirmed")
                 else:
                     raise e
+            
+            # ---------- 여기서부터 응답 처리 ----------
+            auth_result = response.get("AuthenticationResult")
+                                        
+            # device_metadata = response.get('NewDeviceMetadata', {})
+            # device_key = device_metadata.get('DeviceKey')
+            
+            # logger.warning(f"Cognito raw response for {email}: {response}")
+            
+            if not auth_result:
+                logger.error(f"Authentication failed for {email}: No AuthenticationResult")
+                return None
+                                    
+            access_token = auth_result.get("AccessToken")
+            refresh_token = auth_result.get("RefreshToken")
+            
+            if not access_token or not refresh_token:
+                logger.error(f"Missing tokens for {email}")
+                return None
+                
+            tokens = {
+                "access_token": auth_result.get("AccessToken"),
+                "id_token": auth_result.get("IdToken"),
+                "refresh_token": auth_result.get("RefreshToken"),
+                "expires_in": auth_result.get("ExpiresIn", 3600),
+                "token_type": auth_result.get("TokenType", "Bearer")
+            }        
+                    
+            if not tokens["access_token"] or not tokens["refresh_token"]:
+                logger.error(f"Missing tokens for {email}")
+                return None            
+                
+            # 새 디바이스 메타데이터 처리
+            device_metadata = auth_result.get('NewDeviceMetadata', {})
+                
+            # print(f"🔍 Response type: {type(response)}")
+            # print(f"🔍 Full response keys: {list(response.keys())}")
+            # print(f"{response}")
+            # print(f"🔍 NewDeviceMetadata: {device_metadata}")
+            # print(f"🔍 NewDeviceMetadata type: {type(device_metadata)}")
+            # print(f"🔍 NewDeviceMetadata bool: {bool(device_metadata)}")
+                
+            if device_metadata:
+                tokens['device_key'] = device_metadata.get('DeviceKey')
+                tokens['device_group_key'] = device_metadata.get('DeviceGroupKey')
+                logger.info(
+                    f"New device registered for {email}: "
+                    f"device_key={tokens['device_key'][:20] if tokens.get('device_key') else 'None'}..."
+                )
+            elif device_key:
+                # 기존 디바이스로 로그인 성공
+                tokens['device_key'] = device_key
+                logger.debug(f"Authenticated with existing device_key: {device_key[:20]}...")
+                                
+            logger.info(f"Authentication successful for {email}")
+            
+            return tokens
 
         
     async def refresh_token(self, refresh_token: str, device_key: Optional[str] = None) -> Optional[Dict[str, Any]]:

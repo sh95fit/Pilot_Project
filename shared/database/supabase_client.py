@@ -249,8 +249,14 @@ class SupabaseClient:
             response = query.order("created_at", desc=True).execute()
             
             if response.data:
-                return [UserSession(**session) for session in response.data]
+                sessions = [UserSession(**session) for session in response.data]
+                
+                if active_only:
+                    sessions = [s for s in sessions if s.last_used_at is not None]
+                    
+                return sessions
             return []
+        
         except Exception as e:
             logger.error(f"Error fetching user sessions for {user_id}: {e}")
             return []

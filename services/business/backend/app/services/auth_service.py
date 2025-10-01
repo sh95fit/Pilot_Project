@@ -53,11 +53,30 @@ class AuthService:
                 email, supabase_client
             )
             
+            if existing_device_key:
+                logger.debug(f"Found existing device_key for {email}, will attempt to use it")
+            else:
+                logger.debug(f"No existing device_key for {email}")
+            
             # 1. Cognito 인증
             cognito_tokens = await cognito_client.authenticate_user(email, password, device_key=existing_device_key)
             
             if not cognito_tokens:
+                logger.warning(f"Cognito authentication failed for {email}")
                 raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+            # device_key 상태 로깅
+            new_device_key = cognito_tokens.get('device_key')
+            if new_device_key:
+                if new_device_key != existing_device_key:
+                    logger.info(f"New device registered for {email}")
+                else:
+                    logger.debug(f"Using existing device for {email}")
+            else:
+                if existing_device_key:
+                    logger.info(f"Previous device_key was invalid and removed for {email}")
+                else:
+                    logger.debug(f"No device tracking for {email}")            
             
             # 2. Cognito에서 사용자 정보 가져오기
             user_info = await cognito_client.get_user_info(cognito_tokens['access_token'])
@@ -163,7 +182,9 @@ class AuthService:
         try:
             # 이메일로 사용자 조회
             user = await supabase_client.get_user_by_email(email)
+            
             if not user:
+                logger.debug(f"No user found for email: {email}")
                 return None
             
             # 가장 최근 활성 세션의 device_key 조회
@@ -172,16 +193,27 @@ class AuthService:
                 active_only=True
             )
             
-            if sessions:
-                # 가장 최근 세션 (last_used_at 기준)
-                latest_session = max(sessions, key=lambda s: s.last_used_at)
-                device_key = getattr(latest_session, 'device_key', None)
-                
-                if device_key:
-                    logger.debug(f"Found existing device_key for {email}: {device_key[:20]}...")
-                    return device_key
+            if not sessions:
+                logger.debug(f"No active sessions found for {email}")
+                return None
+
+            # last_used_at이 None인 세션 필터링 및 정렬
+            valid_sessions = [s for s in sessions if s.last_used_at is not None]          
+
+            if not valid_sessions:
+                logger.debug(f"No sessions with valid last_used_at for {email}")
+                return None             
+             
+            # 가장 최근 세션 (last_used_at 기준)
+            latest_session = max(valid_sessions, key=lambda s: s.last_used_at)
+            device_key = getattr(latest_session, 'device_key', None)
             
-            return None
+            if device_key:
+                logger.debug(f"Found existing device_key for {email}: {device_key[:20]}...")
+                return device_key
+            else:
+                logger.debug(f"Latest session for {email} has no device_key")
+                return None
             
         except Exception as e:
             logger.warning(f"Failed to get device_key for {email}: {e}")
