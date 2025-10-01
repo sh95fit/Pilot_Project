@@ -28,20 +28,33 @@ class SessionManager:
     def set_auth_tokens(self, access_token: str, session_id: str, expires_minutes: int = 60) -> bool:
         """
         인증 토큰을 쿠키에 저장하고 동기화 완료까지 대기
+        
+        Args:
+            access_token: JWT Access Token
+            session_id: Session ID
+            expires_minutes: Access Token 만료 시간 (분) - 기본 60분
         """
         try:
-            # expires 시간
-            expires = datetime.now() + timedelta(minutes=expires_minutes)
+            # # expires 시간
+            # expires = datetime.now() + timedelta(minutes=expires_minutes)
+            
+            # Access Token 만료 시간 (짧게 - JWT 만료와 동일)
+            access_expires = datetime.now() + timedelta(minutes=expires_minutes)
+            
+            # Session ID 만료 시간 (길게 - 7일)
+            session_expires = datetime.now() + timedelta(days=7)            
+            
             
             # 1. 먼저 세션 상태에 저장 (즉시 반영)
             st.session_state['access_token'] = access_token
             st.session_state['session_id'] = session_id
-            st.session_state['token_expires'] = expires
+            st.session_state['access_token_expires'] = access_expires
+            st.session_state['session_expires'] = session_expires
             st.session_state['authenticated'] = True
             logger.debug("Tokens stored in session state immediately")
             
             # 2. CookieController를 사용하여 쿠키 설정 시도
-            cookie_set_success = self._set_cookies(access_token, session_id, expires)
+            cookie_set_success = self._set_cookies(access_token, session_id, access_expires, session_expires)
             
             if cookie_set_success:
                 # 3. 토큰 동기화 대기
@@ -63,9 +76,21 @@ class SessionManager:
             logger.error(f"Error setting auth tokens: {e}")
             return False
     
-    def _set_cookies(self, access_token: str, session_id: str, expires: datetime) -> bool:
+    def _set_cookies(
+        self, 
+        access_token: str, 
+        session_id: str, 
+        access_expires: datetime,
+        session_expires: datetime
+    ) -> bool:
         """
         쿠키 설정 (내부 메서드)
+        
+        Args:
+            access_token: JWT Access Token
+            session_id: Session ID
+            access_expires: Access Token 쿠키 만료 시간 (짧음, 60분)
+            session_expires: Session ID 쿠키 만료 시간 (길음, 7일)
         """
         try:
             if self.cookie_controller:
@@ -73,7 +98,7 @@ class SessionManager:
                 self.cookie_controller.set(
                     'access_token',
                     access_token,
-                    expires=expires,
+                    expires=access_expires,
                     secure=True,
                     # httponly=True,
                     # samesite="strict"
@@ -82,13 +107,17 @@ class SessionManager:
                 self.cookie_controller.set(
                     'session_id',
                     session_id,
-                    expires=expires,
+                    expires=session_expires,
                     secure=True,
                     # httponly=True,
                     # samesite="strict"
                 )
                 
-                logger.debug("Cookies set using CookieController")
+                logger.debug(
+                    f"Cookies set: "
+                    f"access_token expires in {(access_expires - datetime.now()).total_seconds()/60:.0f}m, "
+                    f"session_id expires in {(session_expires - datetime.now()).total_seconds()/3600:.0f}h"
+                )
                 return True
             else:
                 logger.warning("CookieController not available")
@@ -156,16 +185,30 @@ class SessionManager:
             # 2. 세션 상태에 없으면 쿠키에서 조회 시도
             if self.cookie_controller:
                 try:
-                    access_token = self.cookie_controller.get('access_token')
-                    session_id = self.cookie_controller.get('session_id')
-                    if access_token and session_id:
-                        # 쿠키에서 찾았으면 세션 상태에도 복사
-                        st.session_state['access_token'] = access_token
-                        st.session_state['session_id'] = session_id
+                    cookie_access_token = self.cookie_controller.get('access_token')
+                    cookie_session_id = self.cookie_controller.get('session_id')
+                    
+                    # Session ID만 있어도 반환 (Access Token 만료되어도 갱신 가능)
+                    if cookie_session_id:
+                        access_token = cookie_access_token  # None일 수 있음
+                        session_id = cookie_session_id
+                        
+                        # 세션 상태에 복원
+                        if session_id:
+                            st.session_state['session_id'] = session_id
+                        if access_token:
+                            st.session_state['access_token'] = access_token
+                            
                         st.session_state['authenticated'] = True
                         st.session_state['cookies_synced'] = True
-                        logger.debug("Tokens retrieved from cookies and synced to session")
+                        
+                        logger.debug(
+                            f"Tokens retrieved from cookies: "
+                            f"access_token={'present' if access_token else 'missing'}, "
+                            f"session_id=present"
+                        )
                         return access_token, session_id
+                        
                 except Exception as e:
                     logger.warning(f"CookieController get failed: {e}")
             

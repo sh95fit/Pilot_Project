@@ -92,7 +92,7 @@ class Settings(BaseSettings):
     # JWT 설정
     refresh_token_expire_days: int = 7
     jwt_algorithm: str = "RS256"
-    jwt_access_token_expire_minutes: int = 15
+    jwt_access_token_expire_minutes: int = 60
     jwt_issuer: str 
     jwt_audience: str 
     
