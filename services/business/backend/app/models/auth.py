@@ -2,18 +2,6 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Dict, Any
 
 
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=8)
-
-
-class LoginResponse(BaseModel):
-    success: bool
-    message: str
-    user: Optional[Dict[str, Any]] = None
-    tokens: Optional[Dict[str, str]] = None
-
-
 class TokenInfo(BaseModel):
     """토큰 정보"""
     access_token: str
@@ -26,6 +14,18 @@ class TokenRefreshResponse(BaseModel):
     success: bool
     message: str
     tokens: Optional[TokenInfo] = None  # Streamlit 환경용 토큰 정보
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+
+
+class LoginResponse(BaseModel):
+    success: bool
+    message: str
+    user: Optional[Dict[str, Any]] = None
+    tokens: Optional[TokenInfo] = None
 
 
 class LogoutResponse(BaseModel):

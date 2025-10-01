@@ -54,15 +54,15 @@ class AuthManager:
             
             # 4. 사용자 정보 저장
             st.session_state['user_info'] = user_info
+            st.session_state['last_activity'] = time.time()
             
             # 5. 로그인 성공 상태 설정 (쿠키 동기화 완료 후에도 안전장치로 유지)
             st.session_state['login_success'] = True
-            st.session_state['login_timestamp'] = time.time()
+            # st.session_state['login_timestamp'] = time.time()
             
             # 6. 동기화 상태 로깅
             sync_status = self.session_manager.get_sync_status()
-            logger.info(f"Login successful. Sync status: {sync_status}")
-            
+            logger.info(f"Login successful for {email}. Sync status: {sync_status}")
             return True, None
         
         except Exception as e:
@@ -87,20 +87,10 @@ class AuthManager:
                     logger.debug("API logout called successfully")
                 except Exception as e:
                     logger.warning(f"API logout failed: {e}")
-                    # API 로그아웃 실패해도 로컬 정리는 계속 진행
             
-            # 3. 로컬 토큰 및 상태 삭제
-            clear_success = self.session_manager.clear_auth_tokens()
-            
-            # 4. 로그인 관련 상태 정리
-            login_related_keys = [
-                'login_success', 'login_timestamp', 'user_info'
-            ]
-            
-            for key in login_related_keys:
-                if key in st.session_state:
-                    del st.session_state[key]
-            
+            # 3. 로컬 상태 정리
+            clear_success = self._clear_auth_state()            
+                        
             logger.info(f"Logout completed. Clear success: {clear_success}")
             return True
 
@@ -108,202 +98,52 @@ class AuthManager:
             logger.error(f"Logout error: {e}")
             return False
     
-    
-#####################################################################################    
-    # def check_authentication(self) -> Tuple[bool, Optional[Dict[str, Any]]]:
-    #     """
-    #     인증 상태 확인 - /auth/me API 활용 (개선된 버전)
-    #     """
-    #     try:
-    #         # 1. 로그인 성공 직후 상태 확인 (기존 로직 유지)
-    #         if st.session_state.get('login_success'):
-    #             login_time = st.session_state.get('login_timestamp', 0)
-    #             current_time = time.time()
-                
-    #             # 로그인 성공 후 5초 이내라면 세션 상태 우선 사용 (단축)
-    #             if current_time - login_time < 5:
-    #                 user_info = st.session_state.get('user_info')
-    #                 if user_info:
-    #                     logger.debug("Using session state for recent login")
-                        
-    #                     # 백그라운드에서 쿠키 동기화 상태 확인
-    #                     self._check_and_update_sync_status()
-                        
-    #                     return True, user_info
-    #             else:
-    #                 # 5초 경과 후에는 login_success 플래그 제거
-    #                 self._clear_login_success_flags()
-            
-    #         # 2. 토큰 기반 인증 확인
-    #         access_token, session_id = self.session_manager.get_auth_tokens()
-            
-    #         if not access_token or not session_id:
-    #             logger.debug("No tokens found")
-    #             # 🔧 수정: 새로고침 시 불필요한 삭제 방지
-    #             # 기존처럼 단순히 False 반환 (삭제 로직 제거)
-    #             return False, None
-            
-    #         # 3. 토큰 만료 확인 및 갱신
-    #         # if self.session_manager.is_token_expired(access_token):
-    #         #     logger.debug("Token expired, attempting refresh")
-    #         #     if self._refresh_token(access_token, session_id):
-    #         #         access_token, session_id = self.session_manager.get_auth_tokens()
-    #         #         logger.debug("Token refreshed successfully")
-    #         #     else:
-    #         #         logger.warning("Token refresh failed")
-    #         #         # 실제 토큰 만료/갱신 실패 시에만 삭제
-    #         #         self._clear_auth_state()
-    #         #         return False, None
-            
-    #         # # 4. 토큰 갱신 임계점 확인 
-    #         # elif self.session_manager.should_refresh_token(
-    #         #     access_token, 
-    #         #     settings.TOKEN_REFRESH_THRESHOLD_MINUTES
-    #         # ):
-    #         #     logger.debug("Token needs refresh (threshold reached)")
-    #         #     self._refresh_token(access_token, session_id)
-
-    #         # 3. 토큰 만료 및 갱신 필요 여부 확인
-    #         token_expired = self.session_manager.is_token_expired(access_token)
-    #         needs_refresh = self.session_manager.should_refresh_token(
-    #             access_token, 
-    #             settings.TOKEN_REFRESH_THRESHOLD_MINUTES
-    #         )      
-
-    #         # 4. 토큰 갱신 처리
-    #         if token_expired or needs_refresh:
-    #             refresh_type = "expired" if token_expired else "threshold reached"
-    #             logger.debug(f"Token {refresh_type}, attempting refresh")
-                
-    #             refresh_success, refresh_reason = self._refresh_token(access_token, session_id)
-                
-    #             if refresh_success:
-    #                 # ✅ 갱신된 토큰 다시 가져오기
-    #                 access_token, session_id = self.session_manager.get_auth_tokens()
-    #                 logger.info(f"Token refreshed successfully ({refresh_type})")
-                    
-    #                 # ✅ 갱신 성공 시 실패 카운터 초기화
-    #                 if 'refresh_fail_count' in st.session_state:
-    #                     del st.session_state['refresh_fail_count']
-    #             else:
-    #                 logger.warning(f"Token refresh failed ({refresh_type}): {refresh_reason}")
-                    
-    #                 # Refresh Token 만료 시 즉시 로그아웃
-    #                 if refresh_reason == "refresh_token_expired":
-    #                     logger.error("Refresh Token expired - immediate logout required")
-    #                     self._clear_auth_state()
-    #                     # 사용자에게 알림
-    #                     st.session_state['logout_reason'] = "세션이 만료되었습니다. 다시 로그인해주세요."
-    #                     return False, None
-                    
-    #                 # 토큰이 완전히 만료된 경우에만 인증 상태 삭제
-    #                 if token_expired:
-    #                     logger.error("Token expired and refresh failed - clearing auth state")
-    #                     self._clear_auth_state()
-    #                     return False, None
-                    
-    #                 # ✅ needs_refresh인 경우도 refresh 실패 시 재시도 제한
-    #                 # 연속 실패 카운트 추가
-    #                 refresh_fail_count = st.session_state.get('refresh_fail_count', 0) + 1
-    #                 st.session_state['refresh_fail_count'] = refresh_fail_count
-                    
-    #                 logger.warning(
-    #                     f"Token refresh failed {refresh_fail_count} time(s) - "
-    #                     f"possible refresh token expiration"
-    #                 )
-                    
-    #                 if refresh_fail_count >= 3:
-    #                     # 2회 연속 실패 시 로그아웃 (Refresh Token 만료로 판단)
-    #                     logger.error(
-    #                         f"Token refresh failed {refresh_fail_count} times - "
-    #                         f"clearing auth state"
-    #                     )
-    #                     self._clear_auth_state()
-    #                     st.session_state['logout_reason'] = "토큰 갱신에 반복적으로 실패했습니다. 다시 로그인해주세요."
-    #                     return False, None
-    #                 else:
-    #                     # 1회 실패는 경고만 (다음 체크에서 재시도)
-    #                     logger.warning(
-    #                         f"Token refresh failed ({refresh_fail_count}/2) - "
-    #                         f"will retry on next check" 
-    #                     )     
-                        
-    #         else:
-    #             # ✅ 갱신 불필요 시 카운터 초기화
-    #             if 'refresh_fail_count' in st.session_state:
-    #                 del st.session_state['refresh_fail_count']
-
-    #         # 5. 서버에서 인증 상태 최종 확인 (기존 유지)
-    #         auth_result = self.api_client.check_auth(access_token, session_id)
-            
-    #         if auth_result and auth_result.get('authenticated'):
-    #             # 인증 성공 시 /auth/me API로 최신 사용자 정보 조회
-    #             user_info = self._get_current_user_info(access_token)
-                
-    #             if user_info:
-    #                 # 최신 사용자 정보로 업데이트
-    #                 st.session_state.user_info = user_info
-    #                 st.session_state.last_auth_check = time.time()
-    #                 logger.debug(f"Authentication verified with updated user info: {user_info.get('email', 'unknown')}")
-    #                 return True, user_info
-    #             else:
-    #                 # /auth/me 실패 시 check_auth 결과의 user_info나 세션 값 사용
-    #                 fallback_user_info = auth_result.get('user_info') or st.session_state.get('user_info')
-    #                 if fallback_user_info:
-    #                     st.session_state.user_info = fallback_user_info
-    #                     logger.warning("Using fallback user info due to /auth/me failure")
-    #                     return True, fallback_user_info
-    #                 else:
-    #                     # 사용자 정보 없지만 인증은 성공했으므로 최소 상태만 유지
-    #                     st.session_state.user_info = {"user_id": auth_result.get("user_id")}
-    #                     logger.warning("No detailed user info; using minimal auth state")
-    #                     return True, st.session_state.user_info
-    #         else:
-    #             logger.warning("Server authentication check failed")
-    #             # 서버 인증 실패 시에만 삭제
-    #             self._clear_auth_state()
-    #             return False, None
-                
-    #     except Exception as e:
-    #         logger.error(f"Authentication check error: {e}")
-    #         # 예외 발생 시에만 삭제
-    #         self._clear_auth_state()
-    #         return False, None
-#####################################################################################
+ 
     def check_authentication(self) -> Tuple[bool, Optional[Dict[str, Any]]]:
         """
-        인증 상태 확인 - 개선된 토큰 갱신 로직
+        인증 상태 확인 - 개선된 로직
+        
+        Flow:
+        1. 토큰 존재 확인 (없으면 즉시 False)
+        2. 토큰 만료 확인
+        3. 만료되었거나 임박하면 갱신 (서버가 Redis→DB→Cognito 순으로 처리)
+        4. 갱신 성공하면 계속, 실패하면 로그아웃
         """
-        try:
-            # 1. 로그인 성공 직후 상태 확인 (기존 유지)
-            if st.session_state.get('login_success'):
-                login_time = st.session_state.get('login_timestamp', 0)
-                current_time = time.time()
+        try:                       
+            # # 1. 로그인 성공 직후 상태 확인 (기존 로직 유지)
+            # if st.session_state.get('login_success'):
+            #     login_time = st.session_state.get('login_timestamp', 0)
+            #     current_time = time.time()
                 
-                if current_time - login_time < 5:
-                    user_info = st.session_state.get('user_info')
-                    if user_info:
-                        logger.debug("Using session state for recent login")
-                        self._check_and_update_sync_status()
-                        return True, user_info
-                else:
-                    self._clear_login_success_flags()
+            #     # 로그인 성공 후 5초 이내라면 세션 상태 우선 사용 (단축)
+            #     if current_time - login_time < 5:
+            #         user_info = st.session_state.get('user_info')
+            #         if user_info:
+            #             logger.debug("Using session state for recent login")
+                        
+            #             # 백그라운드에서 쿠키 동기화 상태 확인
+            #             self._check_and_update_sync_status()
+                        
+            #             return True, user_info
+            #     else:
+            #         # 5초 경과 후에는 login_success 플래그 제거
+            #         self._clear_login_success_flags()
             
-            # 2. 토큰 기반 인증 확인
+            # 1. 토큰 기반 인증 확인
             access_token, session_id = self.session_manager.get_auth_tokens()
             
             if not access_token or not session_id:
                 logger.debug("No tokens found")
                 return False, None
-            
-            # 3. Access Token 만료 확인
+
+            # 2. 토큰 만료 및 갱신 필요 여부 확인
             token_expired = self.session_manager.is_token_expired(access_token)
             needs_refresh = self.session_manager.should_refresh_token(
                 access_token, 
                 settings.TOKEN_REFRESH_THRESHOLD_MINUTES
-            )
-            
-            # 4. 토큰 갱신 처리 (만료 또는 임박)
+            )      
+
+            # 3. 토큰 갱신 처리
             if token_expired or needs_refresh:
                 refresh_type = "expired" if token_expired else "threshold reached"
                 logger.debug(f"Token {refresh_type}, attempting refresh")
@@ -311,11 +151,11 @@ class AuthManager:
                 refresh_success, refresh_reason = self._refresh_token(access_token, session_id)
                 
                 if refresh_success:
-                    # 갱신된 토큰 다시 가져오기
+                    # ✅ 갱신된 토큰 다시 가져오기
                     access_token, session_id = self.session_manager.get_auth_tokens()
                     logger.info(f"Token refreshed successfully ({refresh_type})")
                     
-                    # 갱신 성공 시 실패 카운터 초기화
+                    # ✅ 갱신 성공 시 실패 카운터 초기화
                     if 'refresh_fail_count' in st.session_state:
                         del st.session_state['refresh_fail_count']
                 else:
@@ -328,88 +168,140 @@ class AuthManager:
                         st.session_state['logout_reason'] = "세션이 만료되었습니다. 다시 로그인해주세요."
                         return False, None
                     
-                    # Access Token이 완전 만료된 경우에만 인증 실패
+                    # 토큰이 완전히 만료된 경우에만 인증 상태 삭제
                     if token_expired:
                         logger.error("Token expired and refresh failed - clearing auth state")
                         self._clear_auth_state()
+                        st.session_state['logout_reason'] = "토큰이 만료되었습니다. 다시 로그인해주세요."
                         return False, None
                     
-                    # needs_refresh 실패 시 재시도 제한
+                    # ✅ needs_refresh인 경우도 refresh 실패 시 재시도 제한
+                    # 연속 실패 카운트 추가
                     refresh_fail_count = st.session_state.get('refresh_fail_count', 0) + 1
                     st.session_state['refresh_fail_count'] = refresh_fail_count
                     
+                    logger.warning(
+                        f"Token refresh failed {refresh_fail_count} time(s) - "
+                        f"possible refresh token expiration"
+                    )
+                    
                     if refresh_fail_count >= 3:
-                        logger.error(f"Token refresh failed {refresh_fail_count} times - clearing auth state")
+                        # 2회 연속 실패 시 로그아웃 (Refresh Token 만료로 판단)
+                        logger.error(
+                            f"Token refresh failed {refresh_fail_count} times - "
+                            f"clearing auth state"
+                        )
                         self._clear_auth_state()
                         st.session_state['logout_reason'] = "토큰 갱신에 반복적으로 실패했습니다. 다시 로그인해주세요."
                         return False, None
                     else:
-                        logger.warning(f"Token refresh failed ({refresh_fail_count}/3) - will retry")
+                        # 1회 실패는 경고만 (다음 체크에서 재시도)
+                        logger.warning(
+                            f"Token refresh failed ({refresh_fail_count}/2) - "
+                            f"will retry on next check" 
+                        )     
+                        
             else:
-                # 갱신 불필요 시 카운터 초기화
+                # ✅ 갱신 불필요 시 카운터 초기화
                 if 'refresh_fail_count' in st.session_state:
                     del st.session_state['refresh_fail_count']
+
+            # 4. 사용자 정보 확인 (주기적으로만 서버 확인)
+            user_info = self._get_or_refresh_user_info(access_token)
             
-            # 5. 서버 인증 상태 최종 확인 (주기적으로만 수행)
-            last_check = st.session_state.get('last_auth_check', 0)
-            current_time = time.time()
-            check_interval = 300  # 5분마다 서버 확인
-            
-            if current_time - last_check > check_interval:
-                auth_result = self.api_client.check_auth(access_token, session_id)
-                
-                if auth_result and auth_result.get('authenticated'):
-                    # /auth/me로 사용자 정보 갱신
-                    user_info = self._get_current_user_info(access_token)
-                    
-                    if user_info:
-                        st.session_state.user_info = user_info
-                        st.session_state.last_auth_check = current_time
-                        logger.debug(f"Authentication verified: {user_info.get('email', 'unknown')}")
-                        return True, user_info
-                    else:
-                        # fallback
-                        fallback_user_info = auth_result.get('user_info') or st.session_state.get('user_info')
-                        if fallback_user_info:
-                            st.session_state.user_info = fallback_user_info
-                            st.session_state.last_auth_check = current_time
-                            logger.warning("Using fallback user info")
-                            return True, fallback_user_info
-                        else:
-                            st.session_state.user_info = {"user_id": auth_result.get("user_id")}
-                            st.session_state.last_auth_check = current_time
-                            return True, st.session_state.user_info
-                else:
-                    logger.warning("Server authentication check failed")
-                    self._clear_auth_state()
-                    return False, None
+            if user_info:
+                st.session_state['last_activity'] = time.time()
+                return True, user_info
             else:
-                # 최근에 확인했으면 세션 상태 사용
-                user_info = st.session_state.get('user_info')
-                if user_info:
-                    return True, user_info
-                else:
-                    # 정보 없으면 서버 확인
-                    auth_result = self.api_client.check_auth(access_token, session_id)
-                    if auth_result and auth_result.get('authenticated'):
-                        user_info = self._get_current_user_info(access_token)
-                        if user_info:
-                            st.session_state.user_info = user_info
-                            st.session_state.last_auth_check = current_time
-                            return True, user_info
-                    
-                    self._clear_auth_state()
-                    return False, None
+                logger.warning("User info unavailable")
+                self._clear_auth_state()
+                return False, None
                 
         except Exception as e:
-            logger.error(f"Authentication check error: {e}")
+            logger.error(f"Authentication check error: {e}", exc_info=True)
             self._clear_auth_state()
-            return False, None  
-    
-  
-  
-  
-    
+            return False, None
+
+            # # 5. 서버에서 인증 상태 최종 확인 (기존 유지)
+            # auth_result = self.api_client.check_auth(access_token, session_id)
+            
+            # if auth_result and auth_result.get('authenticated'):
+            #     # 인증 성공 시 /auth/me API로 최신 사용자 정보 조회
+            #     user_info = self._get_current_user_info(access_token)
+                
+            #     if user_info:
+            #         # 최신 사용자 정보로 업데이트
+            #         st.session_state.user_info = user_info
+            #         st.session_state.last_auth_check = time.time()
+            #         logger.debug(f"Authentication verified with updated user info: {user_info.get('email', 'unknown')}")
+            #         return True, user_info
+            #     else:
+            #         # /auth/me 실패 시 check_auth 결과의 user_info나 세션 값 사용
+            #         fallback_user_info = auth_result.get('user_info') or st.session_state.get('user_info')
+            #         if fallback_user_info:
+            #             st.session_state.user_info = fallback_user_info
+            #             logger.warning("Using fallback user info due to /auth/me failure")
+            #             return True, fallback_user_info
+            #         else:
+            #             # 사용자 정보 없지만 인증은 성공했으므로 최소 상태만 유지
+            #             st.session_state.user_info = {"user_id": auth_result.get("user_id")}
+            #             logger.warning("No detailed user info; using minimal auth state")
+            #             return True, st.session_state.user_info
+            # else:
+            #     logger.warning("Server authentication check failed")
+            #     # 서버 인증 실패 시에만 삭제
+            #     self._clear_auth_state()
+            #     return False, None
+                
+        # except Exception as e:
+        #     logger.error(f"Authentication check error: {e}")
+        #     # 예외 발생 시에만 삭제
+        #     self._clear_auth_state()
+        #     return False, None
+   
+ 
+    def _get_or_refresh_user_info(self, access_token: str) -> Optional[Dict[str, Any]]:
+        """
+        사용자 정보 조회 - 캐시 우선, 주기적으로만 서버 확인
+        """
+        try:
+            # 캐시된 정보 확인
+            cached_user_info = st.session_state.get('user_info')
+            last_check = st.session_state.get('last_user_info_check', 0)
+            current_time = time.time()
+            
+            # 5분마다만 서버에서 갱신
+            check_interval = 300
+            
+            if cached_user_info and (current_time - last_check) < check_interval:
+                return cached_user_info
+            
+            # 서버에서 최신 정보 조회
+            logger.debug("Fetching fresh user info from server")
+            response = self.api_client.get_current_user(access_token)
+            
+            if response and response.get('success'):
+                user_info = response.get('user_info', {})
+                
+                if user_info.get('email'):
+                    st.session_state['user_info'] = user_info
+                    st.session_state['last_user_info_check'] = current_time
+                    logger.debug(f"User info updated: {user_info['email']}")
+                    return user_info
+            
+            # 서버 조회 실패 시 캐시 사용
+            if cached_user_info:
+                logger.warning("Using cached user info (server fetch failed)")
+                return cached_user_info
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting user info: {e}")
+            # 예외 발생 시에도 캐시 사용
+            return st.session_state.get('user_info') 
+ 
+ 
     def _check_and_update_sync_status(self):
         """
         쿠키 동기화 상태 확인 및 업데이트 (백그라운드 처리)
@@ -441,18 +333,14 @@ class AuthManager:
     
     def _refresh_token(self, access_token: str, session_id: str) -> bool:
         """
-        토큰 갱신 - 동기화 처리 포함
-        
-        Args:
-            access_token: 현재(만료된) access_token - 로깅/검증용
-            session_id: 세션 ID - 실제 갱신에 사용
+        토큰 갱신 - 서버에 session_id만 전달
+        서버가 Redis → Supabase → Cognito 순으로 처리
         
         Returns:
-            Tuple[bool, str]: (성공 여부, 실패 사유)
-            실패 사유: "refresh_token_expired", "network_error", "server_error", "sync_failed"
+            Tuple[성공여부, 실패사유]
         """
         try:
-            logger.debug("Attempting token refresh")
+            logger.debug(f"Refreshing token for session: {session_id[:8]}...")
             
             # result = self.api_client.refresh_token(access_token, session_id)
             
@@ -469,7 +357,7 @@ class AuthManager:
                 logger.error("Refresh Token expired (HTTP 401)")
                 return False, "refresh_token_expired"    
                 
-            # result가 None이거나 success가 False인 경우
+            # 성공 여부 확인
             if not result.get('success'):
                 error_msg = result.get('message', 'Unknown error')
                 
@@ -513,7 +401,7 @@ class AuthManager:
             # tokens가 None인 경우 갱신 실패
             if not tokens:
                 logger.warning("Token refresh failed: no tokens in response")
-                return False
+                return False, "no_tokens"
             
             new_access_token = tokens.get("access_token")
             new_session_id = tokens.get('session_id')
@@ -525,7 +413,7 @@ class AuthManager:
                     f"access_token={bool(new_access_token)}, "
                     f"session_id={bool(new_session_id)}"
                 )
-                return False, "server_error"
+                return False, "invalid_tokens"
             
             # 세션 ID 변경 확인
             if new_session_id != session_id:
@@ -546,8 +434,6 @@ class AuthManager:
             if not update_success:
                 logger.error("Token refresh succeeded but sync failed")
                 return False, "sync_failed"
-            
-            logger.info("Token refresh and sync completed successfully")
                 
             # ✅ 세션 상태 업데이트 (변경된 경우)
             if new_session_id != session_id:
@@ -559,7 +445,8 @@ class AuthManager:
             logger.debug(f"Post-refresh sync status: {sync_status}")
 
             # 갱신 시간 기록
-            st.session_state.last_token_refresh = time.time()
+            # logger.info("Token refresh successful")
+            st.session_state['last_token_refresh'] = time.time()
             
             return True, "success"
 
@@ -653,7 +540,9 @@ class AuthManager:
             
             if not access_token:
                 return False
-            
+
+            # 캐시 무시하고 서버에서 조회
+            st.session_state['last_user_info_check'] = 0            
             user_info = self._get_current_user_info(access_token)
             
             if user_info:
@@ -677,8 +566,8 @@ class AuthManager:
         
         # 세션 상태 정리
         auth_keys = [
-            'user_info', 'login_success', 'login_timestamp', 
-            'is_authenticated', 'auth_checked', 'last_auth_check'
+            'user_info', 'login_success', 'login_timestamp', 'last_token_refresh', 'refresh_fail_count',
+            'is_authenticated', 'auth_checked', 'last_auth_check', 'last_activity', 'last_user_info_check'
         ]
         
         for key in auth_keys:

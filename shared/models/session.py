@@ -12,6 +12,8 @@ class UserSession(BaseModel):
     refresh_expires_at: datetime
     revoked: bool = Field(default=False)
     device_info: Optional[Dict[str, Any]] = Field(default=None)
+    device_key: Optional[str] = Field(default=None, description="Cognito Device Key")
+    device_group_key: Optional[str] = Field(default=None, description="Cognito Device Group Key")
     created_at: datetime
     last_used_at: datetime
 
@@ -47,6 +49,8 @@ class SessionCreate(BaseModel):
     refresh_token_enc: str = Field(..., description="Encrypted refresh token")
     refresh_expires_at: datetime
     device_info: Optional[Dict[str, Any]] = Field(default=None)
+    device_key: Optional[str] = Field(default=None, description="Cognito Device Key")
+    device_group_key: Optional[str] = Field(default=None, description="Cognito Device Group Key")
 
     @field_validator('device_info')
     @classmethod
