@@ -50,11 +50,7 @@ class AuthManager:
             if not token_set_success:
                 error_msg = "토큰 저장에 실패했습니다."
                 logger.error(f"Login failed: {error_msg}")
-                return False, error_msg
-            
-            # st.session_state에도 명시적으로 저장
-            st.session_state['access_token'] = access_token
-            st.session_state['session_id'] = session_id            
+                return False, error_msg       
             
             # 4. 사용자 정보 저장
             st.session_state['user_info'] = user_info
