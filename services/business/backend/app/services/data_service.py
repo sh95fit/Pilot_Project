@@ -3,7 +3,14 @@ from typing import List, Dict, Any, Optional
 from datetime import date, datetime, timedelta
 from backend.app.repositories.data_repository import DataRepository
 from backend.app.core.exceptions import DataValidationError
-from backend.app.api.v1.schemas.data import SalesSummaryResponse, SalesSummaryRequest, SalesSummaryWrapper
+from backend.app.api.v1.schemas.data import (
+    SalesSummaryResponse, 
+    SalesSummaryRequest, 
+    SalesSummaryWrapper,
+    ActiveAccountsResponse,
+    ActiveAccountsRequest,
+    ActiveAccountsWrapper
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -41,7 +48,7 @@ class DataService:
             raise DataValidationError("End date must be after start date")
         
         if (end_date - start_date).days > 1825:
-            raise DataValidationError("Date range cannot exceed 5 year")      
+            raise DataValidationError("Date range cannot exceed 5 years")      
         
         """매출 요약 조회 (MySQL 프로시저 호출)"""
         try:
@@ -61,5 +68,56 @@ class DataService:
             )
         
         except Exception as e:
-            logger.error(f"MySQL procedure error: {e}")
+            logger.error(f"MySQL procedure error in get_sales_summary: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+        
+    async def get_active_accounts(
+        self, 
+        request: ActiveAccountsRequest
+    ) -> ActiveAccountsWrapper:
+        """
+        활성 계정 통계 조회
+        
+        비즈니스 로직:
+        1. 날짜 검증 (최대 5년)
+        2. 활성 계정 데이터 조회
+        
+        Args:
+            request: 활성 계정 조회 요청
+            
+        Returns:
+            일자별 활성 계정 수 및 누적 활성 계정 수
+        """
+        start_date = request.start_date
+        end_date = request.end_date
+        
+        # 1. 날짜 검증
+        if end_date < start_date:
+            raise DataValidationError("End date must be after start date")
+        
+        if (end_date - start_date).days > 1825:
+            raise DataValidationError("Date range cannot exceed 5 years")
+        
+        # 2. 활성 계정 데이터 조회 (MySQL 프로시저 호출)
+        try:
+            results = await self.data_repo.get_active_accounts(start_date, end_date)
+            
+            return ActiveAccountsWrapper(
+                success=True,
+                count=len(results),
+                data=[
+                    ActiveAccountsResponse(
+                        created_date=r["created_date"],
+                        daily_active_accounts=int(r["daily_active_accounts"]),
+                        cumulative_active_accounts=int(r["cumulative_active_accounts"])
+                    )
+                    for r in results
+                ]
+            )
+        
+        except DataValidationError:
+            # 비즈니스 로직 에러는 그대로 전파
+            raise
+        except Exception as e:
+            logger.error(f"MySQL procedure error in get_active_accounts: {e}")
             raise HTTPException(status_code=500, detail=str(e))

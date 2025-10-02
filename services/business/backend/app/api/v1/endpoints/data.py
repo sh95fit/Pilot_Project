@@ -2,7 +2,13 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, Dict, Any, List
 import logging
 from backend.app.core.database import database_manager
-from backend.app.api.v1.schemas.data import ProcedureRequest, SalesSummaryWrapper, SalesSummaryRequest
+from backend.app.api.v1.schemas.data import (
+    ProcedureRequest, 
+    SalesSummaryWrapper, 
+    SalesSummaryRequest,
+    ActiveAccountsWrapper,
+    ActiveAccountsRequest
+)
 from backend.app.core.exceptions import DataValidationError
 from backend.app.core.dependencies.data import get_db
 from backend.app.services.data_service import DataService
@@ -78,6 +84,12 @@ async def get_sales_summary(
     request: SalesSummaryRequest,
     db = Depends(get_db)
 ): 
+    """
+    매출 요약 통계 조회
+    
+    - 날짜 범위: 최대 5년
+    - 반환: 기간별 매출 합계
+    """
     service = DataService(db)
     
     try:
@@ -86,4 +98,28 @@ async def get_sales_summary(
     except DataValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/get_active_accounts", response_model=ActiveAccountsWrapper)
+async def get_active_accounts(
+    request: ActiveAccountsRequest,
+    db = Depends(get_db)
+):
+    """
+    활성 계정 통계 조회
+    
+    - 날짜 범위: 최대 5년
+    - 반환: 일자별 활성 계정 수 및 누적 활성 계정 수
+    - 제외 대상: 테스트, 런치랩, 도준선 계정
+    """
+    service = DataService(db)
+    
+    try:
+        result = await service.get_active_accounts(request)
+        return result
+    except DataValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Active accounts error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -15,37 +15,57 @@ class GoogleSheetsClient:
         Args:
             credentials_json: Google Service Account JSON 키 (문자열 또는 파일 경로)
         """
-        self.credentials_json = credentials_json
+        self.credentials = credentials_json
         self.client = None
         self._initialize_client()
     
     def _initialize_client(self):
         """Google Sheets 클라이언트 초기화"""
         try:
-            # # JSON 문자열인 경우와 파일 경로인 경우 모두 처리
-            # try:
-            #     credentials_dict = json.loads(self.credentials_json)
-            # except json.JSONDecodeError:
-            #     with open(self.credentials_json, 'r') as f:
-            #         credentials_dict = json.load(f)
-            
             credentials_dict = None
             
-            # 1. 파일 경로인지 먼저 확인 (파일이 실제로 존재하는 경우)
-            if os.path.isfile(self.credentials_json):
-                logger.info("Loading credentials from file path")
-                with open(self.credentials_json, 'r') as f:
-                    credentials_dict = json.load(f)
+            # 1. 이미 dict인 경우 (가장 간단)
+            if isinstance(self.credentials, dict):
+                logger.info("Using credentials as dictionary")
+                credentials_dict = self.credentials
+                
+            # 2. 문자열인 경우
+            elif isinstance(self.credentials, str):
+                # 2-1. 파일 경로인지 확인
+                if os.path.isfile(self.credentials):
+                    logger.info("Loading credentials from file path")
+                    with open(self.credentials, 'r', encoding='utf-8') as f:
+                        credentials_dict = json.load(f)
+                else:
+                    # 2-2. JSON 문자열로 파싱 시도
+                    try:
+                        logger.info("Parsing credentials as JSON string")
+                        credentials_str = self.credentials.strip()
+                        
+                        # 작은따옴표를 큰따옴표로 변경
+                        if credentials_str.startswith("{'") or credentials_str.startswith("{ '"):
+                            logger.warning("Detected single quotes in JSON, converting to double quotes")
+                            credentials_str = credentials_str.replace("'", '"')
+                        
+                        credentials_dict = json.loads(credentials_str)
+                        
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse credentials as JSON: {e}")
+                        logger.error(f"First 200 chars: {self.credentials[:200]}")
+                        raise ValueError(
+                            f"credentials must be a dict, valid file path, or valid JSON string. "
+                            f"Parse error: {str(e)}"
+                        )
             else:
-                # 2. JSON 문자열로 파싱 시도
-                try:
-                    logger.info("Parsing credentials as JSON string")
-                    credentials_dict = json.loads(self.credentials_json)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse credentials as JSON: {e}")
-                    raise ValueError(
-                        "credentials_json must be either a valid file path or a valid JSON string"
-                    )
+                raise ValueError(f"credentials must be dict or str, got {type(self.credentials)}")
+            
+            # 필수 필드 검증
+            required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email']
+            missing_fields = [field for field in required_fields if field not in credentials_dict]
+            
+            if missing_fields:
+                raise ValueError(f"Missing required fields in credentials: {missing_fields}")
+            
             
             scopes = [
                 'https://www.googleapis.com/auth/spreadsheets',

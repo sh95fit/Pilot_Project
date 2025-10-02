@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
 import os
+import json
 import logging
 
 from cryptography.hazmat.primitives import serialization
@@ -126,11 +127,11 @@ class Settings(BaseSettings):
      # Google Sheets 설정 property 추가
     @property
     def google_sheets_credentials_sales(self):
-        """Google Sheets 인증 정보 (Sales용)"""
+        """Google Sheets 인증 정보 (Sales용) - dict 반환"""
         if self.google_key_json_sales_path and os.path.exists(self.google_key_json_sales_path):
             try:
-                with open(self.google_key_json_sales_path, 'r') as f:
-                    return f.read()
+                with open(self.google_key_json_sales_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)  # json.load()로 dict 반환
             except Exception as e:
                 logger.error(f"Error reading Google Sheets credentials: {e}")
                 return None
