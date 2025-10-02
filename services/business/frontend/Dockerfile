@@ -56,7 +56,11 @@ ENV HOME=/app
 USER appuser
 
 EXPOSE 8501
-CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
+CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", \
+     "--server.address", "0.0.0.0", \
+     "--server.port", "8501", \
+     "--server.fileWatcherType", "poll", \
+     "--server.runOnSave", "true"]
 
 # =========================
 # 프로덕션 단계 - 완전한 권한 이슈 해결
@@ -84,4 +88,7 @@ ENV HOME=/app
 USER appuser
 
 EXPOSE 8501
-CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
+CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", \
+    "--server.address", "0.0.0.0", \
+    "--server.port", "8501", \
+    "--server.headless", "true"]

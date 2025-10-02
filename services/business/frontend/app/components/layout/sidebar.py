@@ -111,25 +111,32 @@ def _render_user_info(user_info):
 def _render_navigation_menu(pages):
     """
     네비게이션 메뉴 렌더링 - SelectBox 사용
+    쿠키에서 복원된 last_page를 기본값으로 사용
     """
     st.markdown("### 📊 대시보드 메뉴")
     
-    # 기본 선택 페이지 (세션 상태에서 유지)
-    if "selected_page" not in st.session_state:
-        st.session_state.selected_page = list(pages.keys())[0]
+    # 기본 페이지 결정 (쿠키에서 복원된 값 우선)
+    page_list = list(pages.keys())
+    default_page = st.session_state.get("last_page", page_list[0])
+    
+    # 유효하지 않은 페이지면 첫 번째 페이지로
+    if default_page not in page_list:
+        default_page = page_list[0]
+    
+    # 현재 선택된 페이지의 인덱스
+    default_index = page_list.index(default_page)
     
     # 페이지 선택 SelectBox
     selected = st.selectbox(
         "메뉴를 선택하세요:",
-        options=list(pages.keys()),
-        index=list(pages.keys()).index(st.session_state.selected_page) if st.session_state.selected_page in pages else 0,
+        options=page_list,
+        index=default_index,
         key="navigation_selectbox",
         label_visibility="collapsed"
     )
     
-    # 선택된 페이지를 세션에 저장
-    if selected != st.session_state.selected_page:
-        st.session_state.selected_page = selected
+    # 선택된 페이지가 변경되면 로그
+    if selected != st.session_state.get("last_page"):
         logger.info(f"Page changed to: {selected}")
     
     return selected
@@ -183,7 +190,7 @@ def _render_logout_section():
         #     st.json(session_info)
     
     # 버전 정보
-    st.caption("© 2025 Business Dashboard v1.0")
+    st.caption("© 2025 lunchlab all rights reserved")
 
 def render_mobile_navigation(pages, user_info):
     """
@@ -212,4 +219,4 @@ def render_mobile_navigation(pages, user_info):
             
             return selected
     
-    return st.session_state.get("selected_page", list(pages.keys())[0])
+    return st.session_state.get("last_page", list(pages.keys())[0])

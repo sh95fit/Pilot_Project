@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_cookies_controller import CookieController
 from auth.auth_manager import AuthManager
 from components.layout.sidebar import render_sidebar
 from views.login import show_login_page
@@ -9,6 +10,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# 쿠키 컨트롤러 초기화
+cookie_controller = CookieController()
+
 def init_session_state():
     """세션 상태 초기화"""
     defaults = {
@@ -17,6 +21,7 @@ def init_session_state():
         "auth_checked": False,
         "app_initialized": False,
         "last_page": None,
+        "cookie_loaded": False,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -154,9 +159,28 @@ def _render_login_page():
 def _render_authenticated_app(user_info, pages):
     """인증된 사용자용 메인 애플리케이션 렌더링"""
     try:
+        # 쿠키에서 마지막 페이지 복원 (첫 로드 시)
+        if not st.session_state.cookie_loaded:
+            saved_page = cookie_controller.get("last_selected_page")
+            if saved_page and saved_page in pages:
+                st.session_state.last_page = saved_page
+                logger.info(f"Restored last page from cookie: {saved_page}")
+            else:
+                st.session_state.last_page = "💼 경영 대시보드"
+            st.session_state.cookie_loaded = True
+        
         # 사이드바 렌더링
         selected_page = render_sidebar(user_info, pages)
-        st.session_state.last_page = selected_page
+        
+        # 페이지가 변경되었을 때만 쿠키 업데이트
+        if selected_page != st.session_state.get("last_page"):
+            cookie_controller.set(
+                "last_selected_page", 
+                selected_page,
+                max_age=2592000  # 30일
+            )
+            st.session_state.last_page = selected_page
+            logger.info(f"Saved page to cookie: {selected_page}")
 
         # 메인 콘텐츠 렌더링
         with st.container():
