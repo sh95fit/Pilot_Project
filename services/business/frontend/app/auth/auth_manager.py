@@ -146,9 +146,17 @@ class AuthManager:
                     access_token, session_id = self.session_manager.get_auth_tokens()
                     logger.info("Access token refreshed successfully from session_id only")
                     
+                    if not access_token or not session_id:
+                        logger.error("Token refresh succeeded but tokens not available")
+                        self._clear_auth_state()
+                        st.session_state['logout_reason'] = "토큰 갱신 중 오류가 발생했습니다."
+                        return False, None
+                    
                     # 갱신 성공 시 실패 카운터 초기화
                     if 'refresh_fail_count' in st.session_state:
                         del st.session_state['refresh_fail_count']
+                        
+                    logger.info("Access token refreshed successfully from session_id only")
                 else:
                     logger.error(f"Failed to refresh access_token: {refresh_reason}")
                     self._clear_auth_state()
@@ -175,9 +183,17 @@ class AuthManager:
                     access_token, session_id = self.session_manager.get_auth_tokens()
                     logger.info(f"Token refreshed successfully ({refresh_type})")
                     
+                    if not access_token or not session_id:
+                        logger.error("Token refresh succeeded but tokens not available")
+                        self._clear_auth_state()
+                        st.session_state['logout_reason'] = "토큰 갱신 중 오류가 발생했습니다."
+                        return False, None
+                    
                     # 갱신 성공 시 실패 카운터 초기화
                     if 'refresh_fail_count' in st.session_state:
                         del st.session_state['refresh_fail_count']
+                        
+                    logger.info(f"Token refreshed successfully ({refresh_type})")
                 else:
                     logger.warning(f"Token refresh failed ({refresh_type}): {refresh_reason}")
                     
