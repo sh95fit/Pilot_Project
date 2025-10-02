@@ -3,6 +3,7 @@ from google.oauth2.service_account import Credentials
 from typing import List, Dict, Any, Optional
 import logging
 import json
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +22,30 @@ class GoogleSheetsClient:
     def _initialize_client(self):
         """Google Sheets 클라이언트 초기화"""
         try:
-            # JSON 문자열인 경우와 파일 경로인 경우 모두 처리
-            try:
-                credentials_dict = json.loads(self.credentials_json)
-            except json.JSONDecodeError:
+            # # JSON 문자열인 경우와 파일 경로인 경우 모두 처리
+            # try:
+            #     credentials_dict = json.loads(self.credentials_json)
+            # except json.JSONDecodeError:
+            #     with open(self.credentials_json, 'r') as f:
+            #         credentials_dict = json.load(f)
+            
+            credentials_dict = None
+            
+            # 1. 파일 경로인지 먼저 확인 (파일이 실제로 존재하는 경우)
+            if os.path.isfile(self.credentials_json):
+                logger.info("Loading credentials from file path")
                 with open(self.credentials_json, 'r') as f:
                     credentials_dict = json.load(f)
+            else:
+                # 2. JSON 문자열로 파싱 시도
+                try:
+                    logger.info("Parsing credentials as JSON string")
+                    credentials_dict = json.loads(self.credentials_json)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse credentials as JSON: {e}")
+                    raise ValueError(
+                        "credentials_json must be either a valid file path or a valid JSON string"
+                    )
             
             scopes = [
                 'https://www.googleapis.com/auth/spreadsheets',
