@@ -52,6 +52,10 @@ class AuthManager:
                 logger.error(f"Login failed: {error_msg}")
                 return False, error_msg
             
+            # st.session_state에도 명시적으로 저장
+            st.session_state['access_token'] = access_token
+            st.session_state['session_id'] = session_id            
+            
             # 4. 사용자 정보 저장
             st.session_state['user_info'] = user_info
             st.session_state['last_activity'] = time.time()
@@ -132,9 +136,29 @@ class AuthManager:
             # 1. 토큰 기반 인증 확인
             access_token, session_id = self.session_manager.get_auth_tokens()
             
-            if not access_token or not session_id:
+            if not session_id:
                 logger.debug("No tokens found")
                 return False, None
+
+            # access_token이 없으면 즉시 갱신 시도
+            if not access_token:
+                logger.info("No access_token found, attempting refresh with session_id")
+                refresh_success, refresh_reason = self._refresh_token(None, session_id)
+                
+                if refresh_success:
+                    # 갱신된 토큰 다시 가져오기
+                    access_token, session_id = self.session_manager.get_auth_tokens()
+                    logger.info("Access token refreshed successfully from session_id only")
+                    
+                    # 갱신 성공 시 실패 카운터 초기화
+                    if 'refresh_fail_count' in st.session_state:
+                        del st.session_state['refresh_fail_count']
+                else:
+                    logger.error(f"Failed to refresh access_token: {refresh_reason}")
+                    self._clear_auth_state()
+                    st.session_state['logout_reason'] = "세션이 만료되었습니다. 다시 로그인해주세요."
+                    return False, None
+
 
             # 2. 토큰 만료 및 갱신 필요 여부 확인
             token_expired = self.session_manager.is_token_expired(access_token)
@@ -151,11 +175,11 @@ class AuthManager:
                 refresh_success, refresh_reason = self._refresh_token(access_token, session_id)
                 
                 if refresh_success:
-                    # ✅ 갱신된 토큰 다시 가져오기
+                    # 갱신된 토큰 다시 가져오기
                     access_token, session_id = self.session_manager.get_auth_tokens()
                     logger.info(f"Token refreshed successfully ({refresh_type})")
                     
-                    # ✅ 갱신 성공 시 실패 카운터 초기화
+                    # 갱신 성공 시 실패 카운터 초기화
                     if 'refresh_fail_count' in st.session_state:
                         del st.session_state['refresh_fail_count']
                 else:
@@ -175,7 +199,7 @@ class AuthManager:
                         st.session_state['logout_reason'] = "토큰이 만료되었습니다. 다시 로그인해주세요."
                         return False, None
                     
-                    # ✅ needs_refresh인 경우도 refresh 실패 시 재시도 제한
+                    # needs_refresh인 경우도 refresh 실패 시 재시도 제한
                     # 연속 실패 카운트 추가
                     refresh_fail_count = st.session_state.get('refresh_fail_count', 0) + 1
                     st.session_state['refresh_fail_count'] = refresh_fail_count
@@ -202,7 +226,7 @@ class AuthManager:
                         )     
                         
             else:
-                # ✅ 갱신 불필요 시 카운터 초기화
+                # 갱신 불필요 시 카운터 초기화
                 if 'refresh_fail_count' in st.session_state:
                     del st.session_state['refresh_fail_count']
 
@@ -336,6 +360,10 @@ class AuthManager:
         토큰 갱신 - 서버에 session_id만 전달
         서버가 Redis → Supabase → Cognito 순으로 처리
         
+        Args:
+            access_token: 현재 액세스 토큰 (없을 수도 있음)
+            session_id: 세션 ID (필수)
+        
         Returns:
             Tuple[성공여부, 실패사유]
         """
@@ -344,7 +372,7 @@ class AuthManager:
             
             # result = self.api_client.refresh_token(access_token, session_id)
             
-            # ✅ session_id만 전달
+            # session_id만 전달
             result = self.api_client.refresh_token(session_id)
             
             if not result:
@@ -395,7 +423,7 @@ class AuthManager:
             # return True
         
 
-            # ✅ tokens는 result의 두 번째 값 (Tuple 반환 구조)
+            # tokens는 result의 두 번째 값 (Tuple 반환 구조)
             tokens = result.get('tokens')
 
             # tokens가 None인 경우 갱신 실패
@@ -423,7 +451,7 @@ class AuthManager:
                 )
             
             
-            # ✅ 새로운 토큰으로 업데이트 (동기화 포함)
+            # 새로운 토큰으로 업데이트 (동기화 포함)
             expires_minutes = expires_in // 60
             update_success = self.session_manager.set_auth_tokens(
                 new_access_token, 
@@ -434,8 +462,10 @@ class AuthManager:
             if not update_success:
                 logger.error("Token refresh succeeded but sync failed")
                 return False, "sync_failed"
-                
-            # ✅ 세션 상태 업데이트 (변경된 경우)
+             
+            st.session_state['access_token'] = new_access_token
+                               
+            # 세션 상태 업데이트 (변경된 경우)
             if new_session_id != session_id:
                 st.session_state['session_id'] = new_session_id
                 logger.debug(f"Updated session_state with new session_id")
@@ -566,7 +596,7 @@ class AuthManager:
         
         # 세션 상태 정리
         auth_keys = [
-            'user_info', 'login_success', 'login_timestamp', 'last_token_refresh', 'refresh_fail_count',
+            'user_info', 'login_success', 'login_timestamp', 'last_token_refresh', 'refresh_fail_count', 'access_token', 'session_id',
             'is_authenticated', 'auth_checked', 'last_auth_check', 'last_activity', 'last_user_info_check'
         ]
         
