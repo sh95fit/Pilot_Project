@@ -119,6 +119,23 @@ class Settings(BaseSettings):
     refresh_token_renewal_threshold_days: int = 1  # Refresh Token 갱신 임계값 추가 (1일 이내 만료 시)
     cognito_refresh_token_expire_days: int = 30 # Cognito Refresh Token 만료 기간
     
+    # Google Sheets 관련 설정
+    google_key_json_sales_path: str    
+    google_sheet_id_sales: str
+ 
+     # Google Sheets 설정 property 추가
+    @property
+    def google_sheets_credentials_sales(self):
+        """Google Sheets 인증 정보 (Sales용)"""
+        if self.google_key_json_sales_path and os.path.exists(self.google_key_json_sales_path):
+            try:
+                with open(self.google_key_json_sales_path, 'r') as f:
+                    return f.read()
+            except Exception as e:
+                logger.error(f"Error reading Google Sheets credentials: {e}")
+                return None
+        return None
+    
     # RSA 키
 
     # Private/Public Key 읽기
@@ -168,6 +185,10 @@ class Settings(BaseSettings):
             errors.append(f"JWT private key file not found: {self.jwt_private_key_path}")
         if self.jwt_public_key_path and not os.path.exists(self.jwt_public_key_path):
             errors.append(f"JWT public key file not found: {self.jwt_public_key_path}")
+            
+        # Google Sheets 키 파일 존재 확인 추가
+        if self.google_key_json_sales_path and not os.path.exists(self.google_key_json_sales_path):
+            logger.warning(f"Google Sheets key file not found: {self.google_key_json_sales_path}")            
             
         if errors:
             for error in errors:

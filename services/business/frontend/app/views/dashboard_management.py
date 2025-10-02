@@ -58,13 +58,6 @@ def fetch_sales_summary(
         "cookie": f"access_token={access_token}; session_id={session_id}"
     }
     
-    # 파일 미분리 형태
-    # payload = {
-    #     "procedure_name": "get_sales_summary",
-    #     "params": [start_date, end_date]
-    # }
-
-    # 파일 분리 형태
     payload = {
         "start_date": start_date,
         "end_date": end_date
@@ -149,8 +142,13 @@ def create_monthly_sales_chart(df: pd.DataFrame) -> alt.Chart:
     if df.empty:
         return None
     
+    # 3개당 1개만 텍스트 표시하기 위한 인덱스 추가
+    df_copy = df.copy()
+    df_copy['row_index'] = range(len(df_copy))
+    df_copy['show_text'] = df_copy['row_index'] % 3 == 0
+    
     # 라인 + 포인트
-    line = alt.Chart(df).mark_line(
+    line = alt.Chart(df_copy).mark_line(
         point=alt.OverlayMarkDef(size=80, filled=True)
     ).encode(
         x=alt.X(
@@ -174,8 +172,10 @@ def create_monthly_sales_chart(df: pd.DataFrame) -> alt.Chart:
         height=400
     )
     
-    # 포인트 위 텍스트
-    text = alt.Chart(df).mark_text(
+    # 포인트 위 텍스트 (3개당 1개만 표시)
+    text = alt.Chart(df_copy).transform_filter(
+        alt.datum.show_text == True
+    ).mark_text(
         dy=-15,
         color='#1f77b4',
         fontSize=11,
@@ -188,45 +188,18 @@ def create_monthly_sales_chart(df: pd.DataFrame) -> alt.Chart:
     
     return line + text
 
+
 # =============================================================================
 # UI 컴포넌트
 # =============================================================================
 
-def render_date_range_selector() -> Tuple[date, date]:
-    """
-    날짜 범위 선택 UI
-    
-    Returns:
-        Tuple[date, date]: (시작일, 종료일)
-    """
-    col_start, col_end, _ = st.columns([1, 1, 6])
-    
-    with col_start:
-        start_date = st.date_input(
-            "시작일",
-            value=datetime(2023, 1, 1),
-            key="start_date"
-        )
-    
-    with col_end:
-        end_date = st.date_input(
-            "종료일",
-            value=datetime.today(),
-            key="end_date"
-        )
-    
-    # 날짜 검증
-    if start_date > end_date:
-        st.error("시작일은 종료일보다 이전이어야 합니다.")
-        return None, None
-    
-    return start_date, end_date
-
 def render_metrics(
     total_sales: float,
     year_sales: float,
+    current_month_sales: float,
     period_sales: float,
     current_year: int,
+    current_month: int,
     start_date: date,
     end_date: date
 ):
@@ -236,81 +209,83 @@ def render_metrics(
     Args:
         total_sales: 총 매출
         year_sales: 연 매출
+        current_month_sales: 현재 월 매출
         period_sales: 선택 기간 매출
         current_year: 현재 연도
+        current_month: 현재 월
         start_date: 시작일
         end_date: 종료일
     """
-    col1, col2, col3, col4 = st.columns(4)
+    # 카드 스타일
+    st.markdown("""
+    <style>
+    .metric-card {
+        background: white;
+        padding: 1rem 1.3rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 0.8rem;
+    }
+    .metric-card-title {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 0.7rem;
+        text-align: left;
+    }
+    .metric-card-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #333;
+        margin: 0;
+        text-align: center;
+    }
+    .metric-card-subtitle {
+        font-size: 0.75rem;
+        color: #999;
+        margin-top: 0.4rem;
+        text-align: center;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1], gap="medium")
     
     with col1:
-        st.metric(
-            "총 매출 (from 2023)",
-            f"₩{total_sales:,.0f}",
-            help="2023년 1월 1일부터 현재까지"
-        )
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-card-title">총 매출</div>
+            <div class="metric-card-value">{total_sales:,.0f} 원</div>
+            <div class="metric-card-subtitle">2023년 1월 1일부터</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        st.metric(
-            f"연 매출 ({current_year})",
-            f"₩{year_sales:,.0f}",
-            help=f"{current_year}년 1월 1일부터 현재까지"
-        )
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-card-title">연 매출 ({current_year})</div>
+            <div class="metric-card-value">{year_sales:,.0f} 원</div>
+            <div class="metric-card-subtitle">{current_year}년 1월 1일부터</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col3:
-        st.metric(
-            "선택 기간 매출",
-            f"₩{period_sales:,.0f}",
-            help=f"{start_date} ~ {end_date}"
-        )
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-card-title">현재 월 매출 ({current_month}월)</div>
+            <div class="metric-card-value">{current_month_sales:,.0f} 원</div>
+            <div class="metric-card-subtitle">{current_year}년 {current_month}월 1일부터</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col4:
-        # 전월 대비 증감률 (추후 구현)
-        st.metric(
-            "전월 대비",
-            "집계 중",
-            delta=None,
-            help="다음 업데이트에서 제공 예정"
-        )
-
-def render_additional_charts():
-    """추가 분석 차트 (샘플 데이터)"""
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("🎯 월별 목표 달성률")
-        target_data = pd.DataFrame({
-            '월': ['1월', '2월', '3월', '4월'],
-            '달성률': [95, 102, 88, 110]
-        })
-        
-        chart = alt.Chart(target_data).mark_bar().encode(
-            x=alt.X('월:N', axis=alt.Axis(labelAngle=0)),
-            y=alt.Y('달성률:Q', scale=alt.Scale(domain=[0, 120])),
-            color=alt.condition(
-                alt.datum.달성률 >= 100,
-                alt.value('#4CAF50'),  # 초록색
-                alt.value('#FF9800')   # 주황색
-            ),
-            tooltip=['월', '달성률']
-        ).properties(height=300)
-        
-        st.altair_chart(chart, use_container_width=None)
-    
-    with col2:
-        st.subheader("🌍 지역별 매출 비중")
-        region_data = pd.DataFrame({
-            '지역': ['서울', '경기', '부산', '대구', '기타'],
-            '매출_비중': [45, 25, 12, 8, 10]
-        })
-        
-        chart = alt.Chart(region_data).mark_arc(innerRadius=50).encode(
-            theta=alt.Theta('매출_비중:Q'),
-            color=alt.Color('지역:N', legend=alt.Legend(title="지역")),
-            tooltip=['지역', alt.Tooltip('매출_비중:Q', title='비중(%)', format='.1f')]
-        ).properties(height=300)
-        
-        st.altair_chart(chart, use_container_width=None)
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-card-title">선택 기간 매출</div>
+            <div class="metric-card-value">{period_sales:,.0f} 원</div>
+            <div class="metric-card-subtitle">{start_date} ~ {end_date}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # =============================================================================
@@ -320,30 +295,76 @@ def render_additional_charts():
 def show_management_dashboard():
     """경영 대시보드 메인 함수"""
     
-    st.header("📈 경영 대시보드")
-    
     # 인증 확인
     access_token = st.session_state.get("access_token")
     session_id = st.session_state.get("session_id")
     
     if not access_token or not session_id:
-        st.warning("⚠️ 로그인이 필요합니다.")
+        st.warning("로그인이 필요합니다.")
         st.info("좌측 사이드바에서 로그인해주세요.")
         return
     
-    # 날짜 범위 선택
-    start_date_input, end_date_input = render_date_range_selector()
+    # 날짜 선택 박스 스타일
+    st.markdown("""
+    <style>
+    /* 날짜 선택 위젯 스타일 */
+    div[data-testid="stDateInput"] > div > div {
+        background-color: white;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e0e0e0;
+    }
+    div[data-testid="stDateInput"] label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #666;
+    }
+    /* 날짜 입력 필드 크기 축소 */
+    div[data-testid="stDateInput"] input {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
-    if not start_date_input or not end_date_input:
+    # 헤더와 날짜 선택을 같은 줄에 배치
+    col_title, col_space, col_start, col_end = st.columns([3, 2.5, 1.2, 1.2])
+    
+    with col_title:
+        st.header("📈 경영 대시보드")
+    
+    with col_start:
+        start_date_input = st.date_input(
+            "시작일",
+            value=datetime(2023, 1, 1),
+            key="start_date"
+        )
+    
+    with col_end:
+        end_date_input = st.date_input(
+            "종료일",
+            value=datetime.today(),
+            key="end_date"
+        )
+    
+    # 날짜 검증
+    if start_date_input > end_date_input:
+        st.error("시작일은 종료일보다 이전이어야 합니다.")
         return
+    
+    st.markdown("<div style='margin: 1rem 0;'></div>", unsafe_allow_html=True)
     
     try:
         # 현재 날짜
         today = datetime.today().strftime("%Y-%m-%d")
         current_year = datetime.today().year
         
+        # 현재 월 시작일
+        current_month_start = datetime.today().replace(day=1).strftime("%Y-%m-%d")
+        current_month = datetime.today().month
+        
         # API 호출 (캐싱됨)
-        with st.spinner("데이터를 불러오는 중..."):
+        with st.spinner(""):
             # 1. 총 매출 (2023-01-01 ~ 오늘)
             total_data = fetch_sales_summary(
                 "2023-01-01",
@@ -360,7 +381,15 @@ def show_management_dashboard():
                 session_id
             )
             
-            # 3. 선택 기간 매출
+            # 3. 현재 월 매출
+            month_data = fetch_sales_summary(
+                current_month_start,
+                today,
+                access_token,
+                session_id
+            )
+            
+            # 4. 선택 기간 매출
             period_data = fetch_sales_summary(
                 start_date_input.strftime("%Y-%m-%d"),
                 end_date_input.strftime("%Y-%m-%d"),
@@ -371,24 +400,28 @@ def show_management_dashboard():
         # 데이터프레임 변환
         total_df = pd.DataFrame(total_data)
         year_df = pd.DataFrame(year_data)
+        month_df = pd.DataFrame(month_data)
         period_df = pd.DataFrame(period_data)
         
         # 매출 계산
         total_sales = calculate_total_sales(total_df, "total")
         year_sales = calculate_total_sales(year_df, "year")
+        current_month_sales = calculate_total_sales(month_df, "month")
         period_sales = calculate_total_sales(period_df, "month")
         
         # 메트릭 표시
         render_metrics(
             total_sales,
             year_sales,
+            current_month_sales,
             period_sales,
             current_year,
+            current_month,
             start_date_input,
             end_date_input
         )
         
-        st.divider()
+        st.markdown("<div style='margin: 1.5rem 0;'></div>", unsafe_allow_html=True)
         
         # 월별 매출 차트
         st.subheader("📊 매출 추이 (월별)")
@@ -398,44 +431,40 @@ def show_management_dashboard():
         if not monthly_data.empty:
             chart = create_monthly_sales_chart(monthly_data)
             if chart:
-                st.altair_chart(chart, use_container_width=None)
+                st.altair_chart(chart, use_container_width=True)
                 
-                # 데이터 테이블 (토글)
-                with st.expander("📋 상세 데이터 보기"):
-                    display_df = monthly_data[['해당_월', '월_매출액']].copy()
-                    display_df['해당_월'] = display_df['해당_월'].dt.strftime('%Y년 %m월')
-                    st.dataframe(
-                        display_df,
-                        hide_index=True,
-                        width="stretch"
-                    )
+                # # 데이터 테이블 (토글)
+                # with st.expander("📋 상세 데이터 보기", expanded=False):
+                #     display_df = monthly_data[['해당_월', '월_매출액']].copy()
+                #     display_df['해당_월'] = display_df['해당_월'].dt.strftime('%Y년 %m월')
+                #     st.dataframe(
+                #         display_df,
+                #         hide_index=True,
+                #         use_container_width=True,
+                #         height=180
+                #     )
         else:
-            st.info("📭 선택한 기간에 월별 매출 데이터가 없습니다.")
+            st.info("선택한 기간에 월별 매출 데이터가 없습니다.")
         
-        st.divider()
-        
-        # 추가 분석
-        render_additional_charts()
-        
-        # 데이터 새로고침 버튼
-        st.divider()
-        col1, col2, col3 = st.columns([1, 1, 4])
-        with col1:
-            if st.button("🔄 데이터 새로고침", width="stretch"):
-                st.cache_data.clear()
-                st.rerun()
-        with col2:
-            if st.button("📥 데이터 다운로드", width="stretch"):
-                csv = monthly_data.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(
-                    label="CSV 다운로드",
-                    data=csv,
-                    file_name=f"매출데이터_{start_date_input}_{end_date_input}.csv",
-                    mime="text/csv"
-                )
+        # # 데이터 새로고침 버튼
+        # col1, col2, col3 = st.columns([1, 1, 6])
+        # with col1:
+        #     if st.button("🔄 데이터 새로고침", use_container_width=True):
+        #         st.cache_data.clear()
+        #         st.rerun()
+        # with col2:
+        #     if st.button("📥 데이터 다운로드", use_container_width=True):
+        #         csv = monthly_data.to_csv(index=False).encode('utf-8-sig')
+        #         st.download_button(
+        #             label="CSV 다운로드",
+        #             data=csv,
+        #             file_name=f"매출데이터_{start_date_input}_{end_date_input}.csv",
+        #             mime="text/csv",
+        #             use_container_width=True
+        #         )
         
     except requests.HTTPError as http_err:
-        st.error(f"❌ API 호출 실패: {http_err}")
+        st.error(f"API 호출 실패: {http_err}")
         logger.error(f"HTTP error: {http_err}")
         
         if st.button("재시도"):
@@ -443,11 +472,8 @@ def show_management_dashboard():
             st.rerun()
             
     except Exception as e:
-        st.error(f"❌ 오류가 발생했습니다: {str(e)}")
+        st.error(f"오류가 발생했습니다: {str(e)}")
         logger.exception(f"대시보드 처리 중 오류: {e}")
-        
-        # with st.expander("🔍 상세 오류 정보"):
-        #     st.code(str(e))
         
         if st.button("재시도"):
             st.cache_data.clear()
