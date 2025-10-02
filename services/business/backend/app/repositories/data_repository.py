@@ -40,6 +40,44 @@ class DataRepository(BaseRepository[Dict[str, Any]]):
                     raise
 
         return normalized_results
+
+
+    async def get_active_accounts(
+        self, 
+        start_date: date, 
+        end_date: date
+    ) -> List[Dict[str, Any]]:
+        rows = await self.db.mysql.execute_procedure(
+            "get_active_accounts_stats",
+            params=(start_date, end_date)
+        )
+        rows = rows or []
+        
+        # DictCursor를 사용하므로 키 기반 접근으로 변환
+        normalized_results = []
+        for r in rows:
+            try:
+                created_date = r.get("created_date") or r.get("CREATED_DATE")
+                daily_active = r.get("daily_active_accounts") or r.get("DAILY_ACTIVE_ACCOUNTS")
+                cumulative_active = r.get("cumulative_active_accounts") or r.get("CUMULATIVE_ACTIVE_ACCOUNTS")
+
+                normalized_results.append({
+                    "created_date": str(created_date) if created_date else None,
+                    "daily_active_accounts": int(daily_active) if daily_active is not None else 0,
+                    "cumulative_active_accounts": int(cumulative_active) if cumulative_active is not None else 0
+                })
+            except Exception:
+                # 예기치 않은 스키마의 경우 튜플 형태 방어 (만약 DictCursor 미적용 시)
+                if isinstance(r, (list, tuple)) and len(r) >= 3:
+                    normalized_results.append({
+                        "created_date": str(r[0]) if r[0] else None,
+                        "daily_active_accounts": int(r[1]) if r[1] is not None else 0,
+                        "cumulative_active_accounts": int(r[2]) if r[2] is not None else 0
+                    })
+                else:
+                    raise
+
+        return normalized_results
     
     # 추상 메서드 최소 구현
     async def get_by_id(self, id: int) -> Optional[Dict[str, Any]]:
