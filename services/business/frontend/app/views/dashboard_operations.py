@@ -34,23 +34,28 @@ def fetch_metric_dashboard(base_url: str, start_period: str, end_period: str):
         return []
     
 
-def fetch_active_accounts(base_url: str, start_period: str, end_period: str):
-    """현재 기준 활성 계정 수를 가져오는 함수"""
+
+def fetch_active_accounts(base_url: str, start_date: str, end_date: str):
+    """활성 계정 데이터를 가져오는 함수"""
     access_token = st.session_state.get("access_token")
     session_id = st.session_state.get("session_id")
     
     headers = {
         "cookie": f"access_token={access_token}; session_id={session_id}"
     }
-    url = f"{base_url}/api/v1/active-accounts"
-    payload = {}
+    url = f"{base_url}/api/v1/data/get_active_accounts"
+    payload = {
+        "start_date": start_date,
+        "end_date": end_date
+    }
 
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=30)
         response.raise_for_status()
-        return response.json().get("active_accounts", 0)
+        return response.json().get("data", [])
     except Exception as e:
-        return 0    
+        st.error(f"활성 계정 데이터를 불러오는 중 오류가 발생했습니다: {e}")
+        return []
 
 
 # -------------------------------------------
@@ -127,7 +132,9 @@ def show_operations_dashboard():
 
     with st.spinner(""):
         kpi_data = fetch_metric_dashboard(API_URL, start_period, end_period)
-        active_accounts = fetch_active_accounts(API_URL, start_period, end_period)
+        # active_accounts = fetch_active_accounts(API_URL, start_period, end_period)
+        active_accounts_data = fetch_active_accounts(API_URL, "2023-01-01", today.strftime("%Y-%m-%d"))
+        active_accounts = active_accounts_data[-1]["cumulative_active_accounts"] if active_accounts_data else 0
 
     if kpi_data:
         df_kpi = pd.DataFrame(kpi_data)

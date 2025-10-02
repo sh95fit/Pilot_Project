@@ -99,7 +99,7 @@ jobs:
             echo "${{ secrets.JWT_PRIVATE_KEY }}" > $CONFIG_DIR/private_key.pem
             echo "${{ secrets.JWT_PUBLIC_KEY }}" > $CONFIG_DIR/public_key.pem
             echo "${{ secrets.REDIS_CONF_TEMPLATE }}" > $CONFIG_DIR/redis.conf.template  # 미사용(envsubst 환경변수 적용 불안정)
-            echo "${{ secrets.GOOGLE_KEY_JSON_SALES }}" > $CONFIG_DIR/lunchlab-sales-11b6cb3593d0.json
+            printf "%s" "${{ secrets.GOOGLE_KEY_JSON_SALES }}" > $CONFIG_DIR/lunchlab-sales-11b6cb3593d0.json
 
 
             chmod 600 $CONFIG_DIR/main.env
