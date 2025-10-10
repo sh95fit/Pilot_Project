@@ -79,6 +79,49 @@ class DataRepository(BaseRepository[Dict[str, Any]]):
 
         return normalized_results
     
+    async def get_number_of_product_sold(
+        self, 
+        start_date: date, 
+        end_date: date,
+        is_grouped: bool
+    ) -> List[Dict[str, Any]]:
+        rows = await self.db.mysql.execute_procedure(
+            "get_number_of_product_sold",
+            params=(start_date, end_date, is_grouped)
+        )
+        rows = rows or []        
+        
+        # DictCursor를 사용하므로 키 기반 접근으로 변환
+        normalized_results = []
+
+        for r in rows:
+            try:
+                delivery_date = r.get('delivery_date') or r.get('DELIVERY_DATE')
+                product_name = r.get('product_name') or r.get('product') or r.get('PRODUCT_NAME') or r.get('PRODUCT')
+                total_quantity = r.get('total_quantity') or r.get('TOTAL_QUANTITY')
+                total_amount = r.get('total_amount') or r.get('TOTAL_AMOUNT')
+                
+                normalized_results.append({
+                    "delivery_date": str(delivery_date) if delivery_date else None,
+                    "product_name": str(product_name) if product_name else None,
+                    "total_quantity": int(total_quantity) if total_quantity is not None else 0,
+                    "total_amount": int(total_amount) if total_amount is not None else 0
+                })
+            except Exception:
+                # 예기치 않은 스키마의 경우 튜플 형태 방어 (만약 DictCursor 미적용 시)
+                if isinstance(r, (list, tuple)) and len(r) >= 4:
+                    normalized_results.append({
+                        "created_date": str(r[0]) if r[0] else None,
+                        "product_name": str(r[1]) if r[1] is not None else 0,
+                        "total_quantity": int(r[2]) if r[2] is not None else 0,
+                        "total_amount": int(r[3]) if r[3] is not None else 0
+                    })
+                else:
+                    raise
+
+        return normalized_results        
+    
+    
     # 추상 메서드 최소 구현
     async def get_by_id(self, id: int) -> Optional[Dict[str, Any]]:
         raise NotImplementedError

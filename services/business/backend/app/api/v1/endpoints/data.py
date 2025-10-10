@@ -7,7 +7,9 @@ from backend.app.api.v1.schemas.data import (
     SalesSummaryWrapper, 
     SalesSummaryRequest,
     ActiveAccountsWrapper,
-    ActiveAccountsRequest
+    ActiveAccountsRequest,
+    NumberOfProductRequest,
+    NumberOfProductWrapper
 )
 from backend.app.core.exceptions import DataValidationError
 from backend.app.core.dependencies.data import get_db
@@ -123,3 +125,25 @@ async def get_active_accounts(
     except Exception as e:
         logger.error(f"Active accounts error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/get_number_of_product_sold", response_model=NumberOfProductWrapper)
+async def get_number_of_product_sold(
+    request:NumberOfProductRequest,
+    db = Depends(get_db)
+):
+    """
+    일자별 품목별 판매 식수 조회
+    
+    - 날짜 범위 : 최대 5년
+    - 반환 : 일자별 판매 품목 수, 판매 금액
+    """
+    service = DataService(db)
+    
+    try:
+        result = await service.get_number_of_product_sold(request)
+        return result
+    except DataValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Number of Products error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))    
