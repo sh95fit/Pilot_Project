@@ -9,7 +9,10 @@ from backend.app.api.v1.schemas.data import (
     SalesSummaryWrapper,
     ActiveAccountsResponse,
     ActiveAccountsRequest,
-    ActiveAccountsWrapper
+    ActiveAccountsWrapper,
+    NumberOfProductResponse,
+    NumberOfProductRequest,
+    NumberOfProductWrapper
 )
 import logging
 
@@ -28,6 +31,7 @@ class DataService:
     def __init__(self, db):
         self.db = db
         self.data_repo = DataRepository(db)
+
 
     async def get_sales_summary(
         self, 
@@ -70,6 +74,7 @@ class DataService:
         except Exception as e:
             logger.error(f"MySQL procedure error in get_sales_summary: {e}")
             raise HTTPException(status_code=500, detail=str(e))
+        
         
     async def get_active_accounts(
         self, 
@@ -120,4 +125,58 @@ class DataService:
             raise
         except Exception as e:
             logger.error(f"MySQL procedure error in get_active_accounts: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    async def get_number_of_product_sold(
+        self,
+        request: NumberOfProductRequest
+    ) -> NumberOfProductWrapper:
+        """
+        일자별 품목별 판매 식수 조회
+        
+        비즈니스 로직:
+        1. 날짜 검증 (최대 5년)
+        2. 일자별 품목별 판매 식수 데이터 조회        
+        
+        Args:
+            request: 일자별 품목별 판매 식수 조회 요청
+            
+        Returns:
+            일자별 품목별 판매 식수 및 금액
+        """        
+        start_date = request.start_date
+        end_date = request.end_date
+        is_grouped = request.is_grouped
+        
+        # 1. 날짜 검증
+        if end_date < start_date:
+            raise DataValidationError("End date must be after start date")
+        
+        if (end_date - start_date).days > 1825:
+            raise DataValidationError("Date range cannot exceed 5 years")        
+
+        # 2. 일자별 품목별 판매 식수 데이터 조회 (MySQL 프로시저 호출)
+        try:
+            results = await self.data_repo.get_number_of_product_sold(start_date, end_date,is_grouped)
+            
+            return NumberOfProductWrapper(
+                success=True,
+                count=len(results),
+                data=[
+                    NumberOfProductResponse(
+                        delivery_date=r["delivery_date"],
+                        product_name=r["product_name"],
+                        total_quantity=int(r["total_quantity"]),
+                        total_amount=int(r["total_amount"])
+                    )
+                    for r in results
+                ]
+            )
+        
+        except DataValidationError:
+            # 비즈니스 로직 에러는 그대로 전파
+            raise
+        except Exception as e:
+            logger.error(f"MySQL procedure error in get_number_of_product_sold: {e}")
             raise HTTPException(status_code=500, detail=str(e))

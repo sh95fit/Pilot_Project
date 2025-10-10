@@ -76,7 +76,7 @@ def show_operations_dashboard():
     # ==========================================
     
     # 제목과 필터를 한 줄에 배치
-    col_title, col_filter = st.columns([1.6, 10.4])
+    col_title, col_filter = st.columns([1.8, 10.2])
     
     with col_title:
         st.markdown("<h3 style='margin-top:0.5rem;'>📆 영업 지표</h3>", unsafe_allow_html=True)
@@ -113,14 +113,14 @@ def show_operations_dashboard():
             st.write("")  # 빈 공간
         
         with filter_col2:
-            sub_col1, sub_col2 = st.columns([1.5, 1])
+            sub_col1, sub_col2 = st.columns([1.3, 1.1])
             with sub_col1:
                 start_year = st.selectbox("시작 연도", year_options, index=len(year_options)-1, key="start_year")
             with sub_col2:
                 start_month = st.selectbox("월", month_options, index=current_month - 1, key="start_month")
         
         with filter_col3:
-            sub_col3, sub_col4 = st.columns([1.5, 1])
+            sub_col3, sub_col4 = st.columns([1.3, 1.1])
             with sub_col3:
                 end_year = st.selectbox("종료 연도", year_options, index=len(year_options)-1, key="end_year")
             with sub_col4:
@@ -132,7 +132,7 @@ def show_operations_dashboard():
 
     with st.spinner(""):
         kpi_data = fetch_metric_dashboard(API_URL, start_period, end_period)
-        active_accounts_data = fetch_active_accounts(API_URL, "2023-01-01", today.strftime("%Y-%m-%d"))
+        active_accounts_data = fetch_active_accounts(API_URL, "2022-12-27", today.strftime("%Y-%m-%d"))
         active_accounts = active_accounts_data[-1]["cumulative_active_accounts"] if active_accounts_data else 0
 
     if kpi_data:

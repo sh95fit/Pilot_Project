@@ -38,3 +38,23 @@ class ActiveAccountsWrapper(BaseModel):
     success: bool = Field(default=True, description="성공 여부")
     count: int = Field(..., description="결과 개수")
     data: List[ActiveAccountsResponse] = Field(..., description="활성 계정 데이터")
+
+
+class NumberOfProductResponse(BaseModel):
+    """일자별 품목별 판매 식수 응답"""
+    delivery_date: str = Field(..., description="배송일")
+    product_name: str = Field(..., description="품목명")
+    total_quantity: int = Field(..., description="총 판매 수량")
+    total_amount: int = Field(..., description="총 판매 금액")
+    
+class NumberOfProductRequest(BaseModel):
+    """일자별 품목별 판매 식수 조회 요청"""
+    start_date: date = Field(..., description="조회 시작일")
+    end_date: date = Field(..., description="조회 종료일")
+    is_grouped: bool = Field(..., description="조회형태(0:분리,1:통합)")
+
+class NumberOfProductWrapper(BaseModel):
+    """일자별 품목별 판매 식수 응답 래퍼"""
+    success: bool = Field(default=True, description="성공 여부")
+    count: int = Field(..., description="결과 개수")
+    data: List[NumberOfProductResponse] = Field(..., description="품목별 판매 식수 데이터")    
