@@ -955,15 +955,9 @@ def show_operations_dashboard():
         if all_data:
             df_all = pd.DataFrame(all_data)
             df_all["delivery_date"] = pd.to_datetime(df_all["delivery_date"])
-            df_all = df_all.sort_values(by=["delivery_date", "product_name"])
             
-            # 요일 추가 (월, 화, 수, 목, 금, 토, 일)
-            weekday_map = {0: '월', 1: '화', 2: '수', 3: '목', 4: '금', 5: '토', 6: '일'}
-            df_all["weekday"] = df_all["delivery_date"].dt.weekday.map(weekday_map)
-            df_all["date_str"] = df_all["delivery_date"].dt.strftime('%Y-%m-%d') + ' (' + df_all["weekday"] + ')'
-            
+            # 1️⃣ 전체 제품 목록
             all_products = sorted(df_all["product_name"].unique().tolist())
-            
             default_products = [
                 "가정식 도시락", 
                 "가정식 도시락 곱빼기", 
@@ -971,8 +965,22 @@ def show_operations_dashboard():
                 "가정식도시락(특)", 
                 "프레시밀"
             ]
-            
             default_products_filtered = [p for p in default_products if p in all_products]
+            
+            if "product_filter_applied" not in st.session_state:
+                st.session_state.product_filter_applied = default_products_filtered
+            
+            # 2️⃣ 빈 날짜 포함해서 모든 날짜 × 모든 제품 조합 만들기
+            full_index = pd.MultiIndex.from_product(
+                [pd.date_range(start=start_date, end=end_date), all_products],
+                names=["delivery_date", "product_name"]
+            )
+            df_all = df_all.set_index(["delivery_date", "product_name"]).reindex(full_index, fill_value=0).reset_index()
+            
+            # 3️⃣ 요일 및 표시 문자열
+            weekday_map = {0: '월', 1: '화', 2: '수', 3: '목', 4: '금', 5: '토', 6: '일'}
+            df_all["weekday"] = df_all["delivery_date"].dt.weekday.map(weekday_map)
+            df_all["date_str"] = df_all["delivery_date"].dt.strftime('%Y-%m-%d') + ' (' + df_all["weekday"] + ')'
             
             if "product_filter_applied" not in st.session_state:
                 st.session_state.product_filter_applied = default_products_filtered
