@@ -178,14 +178,14 @@ def show_operations_dashboard():
     
     start_period = start_date.strftime("%Y-%m")   # fetch_metric_dashboard용 (년-월)
     end_period = end_date.strftime("%Y-%m")       # fetch_metric_dashboard용 (년-월)
-    start_date = start_date.strftime("%Y-%m-%d")  # fetch_product_sold용 (년-월-일)
-    end_date = end_date.strftime("%Y-%m-%d")      # fetch_product_sold용 (년-월-일)
+    start_date_str = start_date.strftime("%Y-%m-%d")  # fetch_product_sold용 (년-월-일)
+    end_date_str = end_date.strftime("%Y-%m-%d")      # fetch_product_sold용 (년-월-일)
     
     with st.spinner(""):
         kpi_data = fetch_metric_dashboard(API_URL, start_period, end_period)
         active_accounts_data = fetch_active_accounts(API_URL, "2022-12-27", today.strftime("%Y-%m-%d"))
         active_accounts = active_accounts_data[-1]["cumulative_active_accounts"] if active_accounts_data else 0
-        product_sales = fetch_product_sold(API_URL, start_date, end_date, is_grouped=1)
+        product_sales = fetch_product_sold(API_URL, start_date_str, end_date_str, is_grouped=1)
     
     if kpi_data:
         df_kpi = pd.DataFrame(kpi_data)
@@ -530,49 +530,51 @@ def show_operations_dashboard():
         with col_title:
             st.markdown("<h3 style='margin-top:0.5rem;'>🍱 가정식 도시락 판매 현황</h3>", unsafe_allow_html=True)
         
-        with col_filter:
-            st.markdown("""
-            <style>
-            div[data-testid="stDateInput"] > label {
-                font-size: 0.88rem;
-                font-weight: 500;
-            }
-            div[data-testid="stDateInput"] > div > div > input {
-                background-color: white !important;
-                border-radius: 6px;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-                border: 1px solid #e0e0e0 !important;
-                min-height: 38px;
-                font-size: 0.88rem;
-                padding: 0.5rem 0.6rem !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
+        # with col_filter:
+        #     st.markdown("""
+        #     <style>
+        #     div[data-testid="stDateInput"] > label {
+        #         font-size: 0.88rem;
+        #         font-weight: 500;
+        #     }
+        #     div[data-testid="stDateInput"] > div > div > input {
+        #         background-color: white !important;
+        #         border-radius: 6px;
+        #         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+        #         border: 1px solid #e0e0e0 !important;
+        #         min-height: 38px;
+        #         font-size: 0.88rem;
+        #         padding: 0.5rem 0.6rem !important;
+        #     }
+        #     </style>
+        #     """, unsafe_allow_html=True)
             
-            filter_inner_col1, filter_inner_col2, filter_inner_col3 = st.columns([5.7, 2.3, 2.3])
+        #     filter_inner_col1, filter_inner_col2, filter_inner_col3 = st.columns([5.7, 2.3, 2.3])
             
-            with filter_inner_col1:
-                st.write("")
+        #     with filter_inner_col1:
+        #         st.write("")
             
-            with filter_inner_col2:
-                home_start_date = st.date_input(
-                    "시작일",
-                    value=today.replace(day=1) - relativedelta(months=2),
-                    key="home_start_date"
-                )
+        #     with filter_inner_col2:
+        #         home_start_date = st.date_input(
+        #             "시작일",
+        #             value=today.replace(day=1) - relativedelta(months=2),
+        #             key="home_start_date"
+        #         )
             
-            with filter_inner_col3:
-                home_end_date = st.date_input(
-                    "종료일",
-                    value=today,
-                    key="home_end_date"
-                )
+        #     with filter_inner_col3:
+        #         home_end_date = st.date_input(
+        #             "종료일",
+        #             value=today,
+        #             key="home_end_date"
+        #         )
         
         with st.spinner(""):
             home_data = fetch_product_sold(
                 API_URL,
-                home_start_date.strftime("%Y-%m-%d"),
-                home_end_date.strftime("%Y-%m-%d"),
+                # home_start_date.strftime("%Y-%m-%d"),
+                # home_end_date.strftime("%Y-%m-%d"),
+                start_date_str,
+                end_date_str,
                 1
             )
         
@@ -600,7 +602,8 @@ def show_operations_dashboard():
 
                 # ✅ 100일 기준 계산
                 max_days = 100
-                period_days = (home_end_date - home_start_date).days
+                # period_days = (home_end_date - home_start_date).days
+                period_days = (end_date - start_date).days
 
                 # 막대 차트
                 bars = (
@@ -702,49 +705,51 @@ def show_operations_dashboard():
         with col_title:
             st.markdown("<h3 style='margin-top:0.5rem;'>🥗 프레시밀 판매 현황</h3>", unsafe_allow_html=True)
         
-        with col_filter:
-            st.markdown("""
-            <style>
-            div[data-testid="stDateInput"] > label {
-                font-size: 0.88rem;
-                font-weight: 500;
-            }
-            div[data-testid="stDateInput"] > div > div > input {
-                background-color: white !important;
-                border-radius: 6px;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-                border: 1px solid #e0e0e0 !important;
-                min-height: 38px;
-                font-size: 0.88rem;
-                padding: 0.5rem 0.6rem !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
+        # with col_filter:
+        #     st.markdown("""
+        #     <style>
+        #     div[data-testid="stDateInput"] > label {
+        #         font-size: 0.88rem;
+        #         font-weight: 500;
+        #     }
+        #     div[data-testid="stDateInput"] > div > div > input {
+        #         background-color: white !important;
+        #         border-radius: 6px;
+        #         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+        #         border: 1px solid #e0e0e0 !important;
+        #         min-height: 38px;
+        #         font-size: 0.88rem;
+        #         padding: 0.5rem 0.6rem !important;
+        #     }
+        #     </style>
+        #     """, unsafe_allow_html=True)
             
-            filter_inner_col1, filter_inner_col2, filter_inner_col3 = st.columns([5.7, 2.3, 2.3])
+        #     filter_inner_col1, filter_inner_col2, filter_inner_col3 = st.columns([5.7, 2.3, 2.3])
             
-            with filter_inner_col1:
-                st.write("")
+        #     with filter_inner_col1:
+        #         st.write("")
             
-            with filter_inner_col2:
-                fresh_start_date = st.date_input(
-                    "시작일",
-                    value=today.replace(day=1) - relativedelta(months=2),
-                    key="fresh_start_date"
-                )
+        #     with filter_inner_col2:
+        #         fresh_start_date = st.date_input(
+        #             "시작일",
+        #             value=today.replace(day=1) - relativedelta(months=2),
+        #             key="fresh_start_date"
+        #         )
             
-            with filter_inner_col3:
-                fresh_end_date = st.date_input(
-                    "종료일",
-                    value=today,
-                    key="fresh_end_date"
-                )
+        #     with filter_inner_col3:
+        #         fresh_end_date = st.date_input(
+        #             "종료일",
+        #             value=today,
+        #             key="fresh_end_date"
+        #         )
         
         with st.spinner(""):
             fresh_data = fetch_product_sold(
                 API_URL,
-                fresh_start_date.strftime("%Y-%m-%d"),
-                fresh_end_date.strftime("%Y-%m-%d"),
+                # fresh_start_date.strftime("%Y-%m-%d"),
+                # fresh_end_date.strftime("%Y-%m-%d"),
+                start_date_str,
+                end_date_str,
                 1
             )
         
@@ -772,7 +777,7 @@ def show_operations_dashboard():
 
                 # ✅ 100일 기준 계산
                 max_days = 100
-                period_days = (fresh_end_date - fresh_start_date).days
+                period_days = (end_date - start_date).days
 
                 # 막대 차트
                 bars = (
@@ -877,22 +882,22 @@ def show_operations_dashboard():
         with col_filter_group:
             filter_inner_col1, filter_inner_col2, filter_inner_col3, filter_inner_col4 = st.columns([5.2, 2.3, 2.3, 0.7])
             
-            with filter_inner_col1:
-                st.write("")
+            # with filter_inner_col1:
+            #     st.write("")
             
-            with filter_inner_col2:
-                all_start_date = st.date_input(
-                    "시작일",
-                    value=today.replace(day=1) - relativedelta(months=2),
-                    key="all_start_date"
-                )
+            # with filter_inner_col2:
+            #     all_start_date = st.date_input(
+            #         "시작일",
+            #         value=today.replace(day=1) - relativedelta(months=2),
+            #         key="all_start_date"
+            #     )
             
-            with filter_inner_col3:
-                all_end_date = st.date_input(
-                    "종료일",
-                    value=today,
-                    key="all_end_date"
-                )
+            # with filter_inner_col3:
+            #     all_end_date = st.date_input(
+            #         "종료일",
+            #         value=today,
+            #         key="all_end_date"
+            #     )
                 
             with filter_inner_col4:
                 st.markdown("""
@@ -922,8 +927,10 @@ def show_operations_dashboard():
         with st.spinner(""):
             all_data = fetch_product_sold(
                 API_URL,
-                all_start_date.strftime("%Y-%m-%d"),
-                all_end_date.strftime("%Y-%m-%d"),
+                # all_start_date.strftime("%Y-%m-%d"),
+                # all_end_date.strftime("%Y-%m-%d"),
+                start_date_str,
+                end_date_str,
                 0
             )
         
