@@ -39,7 +39,7 @@ def show_login_page():
     st.markdown("""
     <div class="login-content" style="text-align: center; margin-bottom: 2rem;">
         <h1 style="color: #1f2937; font-size: 1.8rem; font-weight: 600; margin-bottom: 0.5rem;">
-            🏢 Business Dashboard
+            🏢 Lunchlab Dashboard
         </h1>
         <p style="color: #6b7280; font-size: 1rem; margin-top: 0.5rem;">
             관리자 로그인이 필요합니다
@@ -53,6 +53,6 @@ def show_login_page():
     # 푸터 (항상 표시)
     st.markdown("""
     <div style="text-align: center; margin-top: 3rem; color: #9ca3af;">
-        <small>© 2025 Business Dashboard. All rights reserved.</small>
+        <small>© 2025 lunchlab all rights reserved</small>
     </div>
     """, unsafe_allow_html=True)
