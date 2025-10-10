@@ -87,7 +87,7 @@ def fetch_sales_summary(
 # 데이터 처리 함수
 # =============================================================================
 
-def calculate_total_sales(df: pd.DataFrame, period_type: str = "total") -> float:
+def calculate_total_sales(df: pd.DataFrame, period_type: str = "total", fee_ratio: float = 0.9) -> float:
     """
     특정 기간 타입의 총 매출 계산
     
@@ -96,13 +96,14 @@ def calculate_total_sales(df: pd.DataFrame, period_type: str = "total") -> float
         period_type: 기간 타입 (total, year, month)
     
     Returns:
-        float: 총 매출액
+        float: 총 매출액 * 0.9 (VAT 제외)
     """
     filtered = df[df["period_type"] == period_type]
-    return filtered["total_amount_sum"].sum() if not filtered.empty else 0.0
+    total = filtered["total_amount_sum"].sum() if not filtered.empty else 0.0
+    return total * fee_ratio
 
 
-def prepare_monthly_chart_data(df: pd.DataFrame) -> pd.DataFrame:
+def prepare_monthly_chart_data(df: pd.DataFrame, fee_ratio: float = 0.9) -> pd.DataFrame:
     """
     월별 차트용 데이터 준비
     
@@ -116,6 +117,9 @@ def prepare_monthly_chart_data(df: pd.DataFrame) -> pd.DataFrame:
     
     if month_df.empty:
         return pd.DataFrame()
+    
+    # 수수료 적용
+    month_df['total_amount_sum'] = month_df['total_amount_sum'] * fee_ratio
     
     # 날짜 변환
     month_df['해당_월'] = pd.to_datetime(month_df['period_label'])
@@ -254,7 +258,7 @@ def render_metrics(
     with col1:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-card-title">총 매출</div>
+            <div class="metric-card-title">총 매출 (VAT 제외)</div>
             <div class="metric-card-value">{total_sales:,.0f} 원</div>
             <div class="metric-card-subtitle">2023년 1월 1일부터</div>
         </div>
@@ -263,7 +267,7 @@ def render_metrics(
     with col2:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-card-title">연 매출 ({current_year})</div>
+            <div class="metric-card-title">연 매출 ({current_year}) (VAT 제외)</div>
             <div class="metric-card-value">{year_sales:,.0f} 원</div>
             <div class="metric-card-subtitle">{current_year}년 1월 1일부터</div>
         </div>
@@ -272,7 +276,7 @@ def render_metrics(
     with col3:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-card-title">현재 월 매출 ({current_month}월)</div>
+            <div class="metric-card-title">현재 월 매출 ({current_month}월) (VAT 제외)</div>
             <div class="metric-card-value">{current_month_sales:,.0f} 원</div>
             <div class="metric-card-subtitle">{current_year}년 {current_month}월 1일부터</div>
         </div>
@@ -281,7 +285,7 @@ def render_metrics(
     with col4:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-card-title">선택 기간 매출</div>
+            <div class="metric-card-title">선택 기간 매출 (VAT 제외)</div>
             <div class="metric-card-value">{period_sales:,.0f} 원</div>
             <div class="metric-card-subtitle">{start_date} ~ {end_date}</div>
         </div>
@@ -424,7 +428,7 @@ def show_management_dashboard():
         st.markdown("<div style='margin: 1.5rem 0;'></div>", unsafe_allow_html=True)
         
         # 월별 매출 차트
-        st.subheader("📊 매출 추이 (월별)")
+        st.subheader("📊 매출 추이 (월별) (VAT 제외)")
         
         monthly_data = prepare_monthly_chart_data(period_df)
         
@@ -433,16 +437,16 @@ def show_management_dashboard():
             if chart:
                 st.altair_chart(chart, use_container_width=True)
                 
-                # # 데이터 테이블 (토글)
-                # with st.expander("📋 상세 데이터 보기", expanded=False):
-                #     display_df = monthly_data[['해당_월', '월_매출액']].copy()
-                #     display_df['해당_월'] = display_df['해당_월'].dt.strftime('%Y년 %m월')
-                #     st.dataframe(
-                #         display_df,
-                #         hide_index=True,
-                #         use_container_width=True,
-                #         height=180
-                #     )
+            with st.expander("📋 월별 매출 요약 보기", expanded=False):
+                display_df = monthly_data[['해당_월', '월_매출액']].copy()
+                display_df['해당_월'] = display_df['해당_월'].dt.strftime('%Y-%m')  # YYYY-MM 포맷
+                
+                st.dataframe(
+                    display_df,
+                    hide_index=True,
+                    use_container_width=True,
+                    height=400
+                )                
         else:
             st.info("선택한 기간에 월별 매출 데이터가 없습니다.")
         
