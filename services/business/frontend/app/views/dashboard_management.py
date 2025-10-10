@@ -437,16 +437,16 @@ def show_management_dashboard():
             if chart:
                 st.altair_chart(chart, use_container_width=True)
                 
-                # # 데이터 테이블 (토글)
-                # with st.expander("📋 상세 데이터 보기", expanded=False):
-                #     display_df = monthly_data[['해당_월', '월_매출액']].copy()
-                #     display_df['해당_월'] = display_df['해당_월'].dt.strftime('%Y년 %m월')
-                #     st.dataframe(
-                #         display_df,
-                #         hide_index=True,
-                #         use_container_width=True,
-                #         height=180
-                #     )
+            with st.expander("📋 월별 매출 요약 보기", expanded=False):
+                display_df = monthly_data[['해당_월', '월_매출액']].copy()
+                display_df['해당_월'] = display_df['해당_월'].dt.strftime('%Y-%m')  # YYYY-MM 포맷
+                
+                st.dataframe(
+                    display_df,
+                    hide_index=True,
+                    use_container_width=True,
+                    height=400
+                )                
         else:
             st.info("선택한 기간에 월별 매출 데이터가 없습니다.")
         
