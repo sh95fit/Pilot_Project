@@ -58,6 +58,7 @@ cryptography = "^45.0.7"
 aioboto3 = "^15.1.0"
 asyncio = "^4.0.0"
 asyncssh = "^2.21.0"
+python-dateutil = "^2.9.0.post0"
 
 # 구글 스프레드시트 관련
 gspread = "^6.2.1"

@@ -13,7 +13,7 @@ def render_sidebar(user_info, pages):
         # 사이드바 헤더
         st.markdown("""
         <div style="text-align: center; margin-bottom: 2rem; padding: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white;">
-            <h2 style="margin: 0; color: white;">🏢 Business Dashboard</h2>
+            <h2 style="margin: 0; color: white;">🏢 Lunchlab Dashboard</h2>
             <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 0.9rem;">관리자 대시보드</p>
         </div>
         """, unsafe_allow_html=True)
