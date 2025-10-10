@@ -591,6 +591,15 @@ def show_operations_dashboard():
                 df_home_agg["delivery_date"] = pd.to_datetime(df_home_agg["delivery_date"])
                 df_home_agg = df_home_agg.sort_values(by="delivery_date")
                 
+                full_dates = pd.date_range(start=start_date, end=end_date, freq='D')
+                df_home_agg = (
+                    pd.DataFrame({'delivery_date': full_dates})
+                    .merge(df_home_agg, on='delivery_date', how='left')
+                    .fillna({'total_quantity': 0, 'total_amount': 0})
+                )
+
+                df_home_agg["date_str"] = df_home_agg["delivery_date"].dt.strftime('%Y-%m-%d')                
+                
                 # 요일 추가
                 weekday_map = {0: '월', 1: '화', 2: '수', 3: '목', 4: '금', 5: '토', 6: '일'}
                 df_home_agg["weekday"] = df_home_agg["delivery_date"].dt.weekday.map(weekday_map)
@@ -765,6 +774,15 @@ def show_operations_dashboard():
                 
                 df_fresh_agg["delivery_date"] = pd.to_datetime(df_fresh_agg["delivery_date"])
                 df_fresh_agg = df_fresh_agg.sort_values(by="delivery_date")
+                
+                full_dates = pd.date_range(start=start_date, end=end_date, freq='D')
+                df_fresh_agg = (
+                    pd.DataFrame({'delivery_date': full_dates})
+                    .merge(df_fresh_agg, on='delivery_date', how='left')
+                    .fillna({'total_quantity': 0, 'total_amount': 0})
+                )
+
+                df_fresh_agg["date_str"] = df_fresh_agg["delivery_date"].dt.strftime('%Y-%m-%d')                
                 
                 # 요일 추가 (월~일)
                 weekday_map = {0: '월', 1: '화', 2: '수', 3: '목', 4: '금', 5: '토', 6: '일'}
