@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -156,6 +155,12 @@ def show_operations_dashboard():
         </style>
         """, unsafe_allow_html=True)
         
+        # ✅ session_state 초기화
+        if "metric_start_date_value" not in st.session_state:
+            st.session_state.metric_start_date_value = today.replace(day=1)
+        if "metric_end_date_value" not in st.session_state:
+            st.session_state.metric_end_date_value = today
+        
         # ✅ 년월일 선택 UI
         filter_col1, filter_col2, filter_col3 = st.columns([7, 2.3, 2.3])
         
@@ -165,21 +170,31 @@ def show_operations_dashboard():
         with filter_col2:
             start_date = st.date_input(
                 "시작일",
-                value=today.replace(day=1),
-                key="metric_start_date"
+                value=st.session_state.metric_start_date_value,
+                key="metric_start_date",
+                max_value=min(today, st.session_state.metric_end_date_value)
             )
+            st.session_state.metric_start_date_value = start_date
         
         with filter_col3:
             end_date = st.date_input(
                 "종료일",
-                value=today,
-                key="metric_end_date"
-            )    
+                value=st.session_state.metric_end_date_value,
+                key="metric_end_date",
+                min_value=st.session_state.metric_start_date_value,
+                max_value=today
+            )
+            st.session_state.metric_end_date_value = end_date
     
     start_period = start_date.strftime("%Y-%m")   # fetch_metric_dashboard용 (년-월)
     end_period = end_date.strftime("%Y-%m")       # fetch_metric_dashboard용 (년-월)
     start_date_str = start_date.strftime("%Y-%m-%d")  # fetch_product_sold용 (년-월-일)
     end_date_str = end_date.strftime("%Y-%m-%d")      # fetch_product_sold용 (년-월-일)
+    
+    # 날짜 유효성 검사
+    if start_date > end_date:
+        st.error("⚠️ 시작일이 종료일보다 늦을 수 없습니다. 날짜를 다시 선택해주세요.")
+        return
     
     with st.spinner(""):
         kpi_data = fetch_metric_dashboard(API_URL, start_period, end_period)
@@ -187,72 +202,78 @@ def show_operations_dashboard():
         active_accounts = active_accounts_data[-1]["cumulative_active_accounts"] if active_accounts_data else 0
         product_sales = fetch_product_sold(API_URL, start_date_str, end_date_str, is_grouped=1)
     
+    # kpi 데이터 처리
     if kpi_data:
         df_kpi = pd.DataFrame(kpi_data)
+        lead_count = df_kpi['lead_count'].sum()
+        trial_conversion = df_kpi['trial_conversion'].sum()
+        subscription_conversion = df_kpi['subscription_conversion'].sum()
+    else:
+        lead_count = 0
+        trial_conversion = 0
+        subscription_conversion = 0
         
-        st.markdown("""
-        <style>
-        .kpi-card {
-            background: white;
-            padding: 1rem 1.3rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            margin-bottom: 0.8rem;
-        }
-        .kpi-card-title {
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: #666;
-            margin-bottom: 0.7rem;
-            text-align: left;
-        }
-        .kpi-card-value {
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: #333;
-            margin: 0;
-            text-align: center;
-        }
-        </style>
+    st.markdown("""
+    <style>
+    .kpi-card {
+        background: white;
+        padding: 1rem 1.3rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 0.8rem;
+    }
+    .kpi-card-title {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 0.7rem;
+        text-align: left;
+    }
+    .kpi-card-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #333;
+        margin: 0;
+        text-align: center;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+        
+    kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5, kpi_col6 = st.columns([1, 1, 1, 1,1,1], gap="medium")
+    
+    with kpi_col1:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-card-title">유입 리드 수</div>
+            <div class="kpi-card-value">{lead_count:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with kpi_col2:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-card-title">체험 전환 수</div>
+            <div class="kpi-card-value">{trial_conversion:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with kpi_col3:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-card-title">구독 전환 수</div>
+            <div class="kpi-card-value">{subscription_conversion:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with kpi_col4:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-card-title">활성 계정 수</div>
+            <div class="kpi-card-value">{active_accounts:,}</div>
+        </div>
         """, unsafe_allow_html=True)
         
-        kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5, kpi_col6 = st.columns([1, 1, 1, 1,1,1], gap="medium")
-        
-        with kpi_col1:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-card-title">유입 리드 수</div>
-                <div class="kpi-card-value">{df_kpi['lead_count'].sum():,}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with kpi_col2:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-card-title">체험 전환 수</div>
-                <div class="kpi-card-value">{df_kpi['trial_conversion'].sum():,}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with kpi_col3:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-card-title">구독 전환 수</div>
-                <div class="kpi-card-value">{df_kpi['subscription_conversion'].sum():,}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with kpi_col4:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-card-title">활성 계정 수</div>
-                <div class="kpi-card-value">{active_accounts:,}</div>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.warning("KPI 데이터를 불러오지 못했습니다.")
-        
-    # 판매 데이터가 존재할 때
+    # 판매 데이터 처리
     if product_sales:
         df_sales = pd.DataFrame(product_sales)
         
@@ -261,24 +282,25 @@ def show_operations_dashboard():
 
         # 프레시밀 금액 합산
         freshmeal_amount = df_sales[df_sales['product_name'] == "프레시밀"]['total_quantity'].sum()
-        
-        with kpi_col5:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-card-title">가정식 판매 현황</div>
-                <div class="kpi-card-value">{home_meal_amount:,.0f}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with kpi_col6:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-card-title">프레시밀 판매 현황</div>
-                <div class="kpi-card-value">{freshmeal_amount:,.0f}</div>
-            </div>
-            """, unsafe_allow_html=True)
     else:
-        st.warning("상품 판매 데이터를 불러오지 못했습니다.")
+        home_meal_amount = 0
+        freshmeal_amount = 0
+        
+    with kpi_col5:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-card-title">가정식 판매 현황</div>
+            <div class="kpi-card-value">{home_meal_amount:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with kpi_col6:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-card-title">프레시밀 판매 현황</div>
+            <div class="kpi-card-value">{freshmeal_amount:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.markdown("<div style='margin: 0.8rem 0;'></div>", unsafe_allow_html=True)
     
@@ -634,7 +656,7 @@ def show_operations_dashboard():
                     )
                 )
 
-                # ✅ 6개월 이하일 때만 수치 표시
+                # ✅ 100일 이하일 때만 수치 표시
                 if period_days <= max_days:
                     text = (
                         alt.Chart(df_home_agg)
