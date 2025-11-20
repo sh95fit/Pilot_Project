@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+*.pem
+*.key
+*.ppk
+
+# Poetry
+.poetry/
+poetry.lock
+
+# Docker
+*.log
+*.pid
+*.swp
+*.swo
+docker-compose.override.yml
+**/venv/
+**/.venv/
+**/__pycache__/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+/config/*
+!frontend/config/*
+
+temp/
+
+backup/
