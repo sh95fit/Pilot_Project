@@ -68,14 +68,29 @@ services:
         max-file: "5"
 
   celery_worker:
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - RELOAD=false
     env_file:
       - ../../../config/main.env
 
   celery_beat:
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - RELOAD=false
     env_file:
       - ../../../config/main.env
 
   celery_flower:
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - RELOAD=false
     env_file:
       - ../../../config/main.env
 
