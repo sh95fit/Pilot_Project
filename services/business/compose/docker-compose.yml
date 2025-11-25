@@ -26,6 +26,7 @@ services:
       context: ../../../          # 루트 디렉토리를 context로 설정
       dockerfile: services/business/backend/Dockerfile
       target: ${BUILD_TARGET:-dev}
+      # 동적할당되어 UID, GID가 변경될 경우 해당 값으로 덮어씀 / Dockerfile에 명시된 값도 덮어쓰므로 문제 없음
       args:
         - APP_UID=${DOCKER_UID:-1001}
         - APP_GID=${DOCKER_GID:-1001}
