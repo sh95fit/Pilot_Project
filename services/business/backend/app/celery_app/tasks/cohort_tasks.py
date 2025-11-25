@@ -84,12 +84,16 @@ def update_not_ordered_cohort(self):
         
         now = datetime.now()
         
-        # 금요일(weekday=4)인 경우 +3일(월요일), 그 외는 +1일
+        # 금요일(weekday=4) -> +3일(월요일), 토요일(weekday=5) -> +2일(월요일), 그 외는 +1일
         if now.weekday() == 4:  # 금요일
             days_to_add = 3
             logger.info("Friday detected - targeting Monday")
+        elif now.weekday() == 5:  # 토요일
+            days_to_add = 2
+            logger.info("Saturday detected - targeting Monday")
         else:
             days_to_add = 1
+            logger.info("Weekday detected - targeting next day")
         
         # 스케줄러 기준 익일 날짜
         target_date = (now + timedelta(days=days_to_add)).strftime("%Y-%m-%d")
