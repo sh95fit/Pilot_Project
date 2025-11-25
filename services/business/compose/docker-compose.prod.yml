@@ -66,4 +66,19 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
-  
+
+  celery_worker:
+    env_file:
+      - ../../../config/main.env
+
+  celery_beat:
+    env_file:
+      - ../../../config/main.env
+
+  celery_flower:
+    env_file:
+      - ../../../config/main.env
+
+  rabbitmq:
+    env_file:
+      - ../../../config/main.env

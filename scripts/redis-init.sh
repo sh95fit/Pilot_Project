@@ -25,6 +25,7 @@ appendonly yes
 user default off
 
 # 신규 계정
+# user $REDIS_USERNAME on >$REDIS_PASSWORD ~* &* +@all
 user $REDIS_USERNAME on >$REDIS_PASSWORD ~* +@all
 EOF
 
