@@ -74,8 +74,8 @@ services:
       - LOG_LEVEL=INFO
       - RELOAD=false
     env_file:
-      - ../../../config/main.env
-
+      - ../../../config/main.env  
+      
   celery_beat:
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
