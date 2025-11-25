@@ -123,6 +123,7 @@ class Settings(BaseSettings):
     # Google Sheets 관련 설정
     google_key_json_sales_path: str    
     google_sheet_id_sales: str
+    google_sheet_id_cohort: str
  
      # Google Sheets 설정 property 추가
     @property
@@ -137,6 +138,16 @@ class Settings(BaseSettings):
                 return None
         return None
     
+    # Celery 관련 설정
+    celery_broker_url: str
+    celery_result_backend: str
+    celery_timezone: str
+    
+    # RabbitMQ 관련 설정정
+    rabbitmq_user:str
+    rabbitmq_pass:str
+    
+     
     # RSA 키
 
     # Private/Public Key 읽기
