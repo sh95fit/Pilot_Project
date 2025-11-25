@@ -82,9 +82,17 @@ def update_not_ordered_cohort(self):
         
         loop = asyncio.get_event_loop()
         
+        now = datetime.now()
+        
+        # 금요일(weekday=4)인 경우 +3일(월요일), 그 외는 +1일
+        if now.weekday() == 4:  # 금요일
+            days_to_add = 3
+            logger.info("Friday detected - targeting Monday")
+        else:
+            days_to_add = 1
+        
         # 스케줄러 기준 익일 날짜
-        target_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        # target_date = (datetime.now() + timedelta(days=1)).date()
+        target_date = (now + timedelta(days=days_to_add)).strftime("%Y-%m-%d")
         
         raw_data = loop.run_until_complete(
             mysql_client.execute_procedure(
@@ -103,8 +111,48 @@ def update_not_ordered_cohort(self):
         # Google Sheets 업데이트
         worksheet_name = "자동화_미주문고객사"
         spreadsheet_id = settings.google_sheet_id_cohort
+ 
+        # 1. 워크시트 정보 조회 (전체 행/열 수 확인)
+        worksheet_info = loop.run_until_complete(
+            self._sheets_client.get_worksheet_info(
+                spreadsheet_id=spreadsheet_id,
+                worksheet_name=worksheet_name
+            )
+        )        
         
-        # 1A2:E2 병합셀에 target_date 입력
+        total_rows = worksheet_info['row_count']
+        total_cols = worksheet_info['col_count']
+        
+        logger.info(f"Worksheet info - rows: {total_rows}, cols: {total_cols}")
+
+        # 2. 현재 시트의 데이터 범위 확인
+        existing_data = loop.run_until_complete(
+            self._sheets_client.get_range_data(
+                spreadsheet_id=spreadsheet_id,
+                worksheet_name=worksheet_name,
+                cell_range=f"A3:{chr(64 + min(total_cols, 26))}{total_rows}"
+            )
+        )
+        
+        # 3. 기존 데이터가 있다면 삭제
+        if existing_data and len(existing_data) > 0:
+            max_rows = len(existing_data)
+            # 실제 데이터의 최대 컬럼 수 확인
+            max_columns = max(len(row) for row in existing_data) if existing_data else len(sheet_data[0])
+            empty_data = [[""] * max_columns for _ in range(max_rows)]
+            
+            loop.run_until_complete(
+                self._sheets_client.update_range(
+                    spreadsheet_id=spreadsheet_id,
+                    worksheet_name=worksheet_name,
+                    cell_range="A3",
+                    values=empty_data,
+                    value_input_option="USER_ENTERED"
+                )
+            )
+            logger.info(f"Cleared {max_rows} rows x {max_columns} columns from A3")
+            
+        # 3. A2:E2 병합셀에 target_date 입력
         loop.run_until_complete(
             self._sheets_client.update_range(
                 spreadsheet_id=spreadsheet_id,
@@ -115,7 +163,7 @@ def update_not_ordered_cohort(self):
             )
         )
         
-        # 기존 데이터 삭제 후 새로 입력 (A3부터)
+        # 4. 새로운 데이터 입력 (A3부터)
         result = loop.run_until_complete(
             self._sheets_client.update_range(
                 spreadsheet_id=spreadsheet_id,
@@ -124,7 +172,7 @@ def update_not_ordered_cohort(self):
                 values=sheet_data,
                 value_input_option="USER_ENTERED"
             )
-        )
+        )        
         
         logger.info(f"✅ NOT ORDERED cohort updated: {len(raw_data)} rows")
         
