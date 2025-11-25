@@ -120,7 +120,6 @@ services:
     container_name: business_celery_flower
     command: celery -A backend.app.celery_app.celery_config:celery_app flower --port=5555
     environment:
-      # - ENVIRONMENT=${ENVIRONMENT:-dev}
       - TZ=Asia/Seoul
       - PYTHONPATH=/app/backend
     working_dir: /app
