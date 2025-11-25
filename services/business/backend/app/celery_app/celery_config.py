@@ -45,7 +45,7 @@ celery_app.conf.update(
         # 매일 오후 2시 40 - 미주문 고객사 데이터 업데이트
         "update-not-ordered-cohort": {
             "task": "app.celery_app.tasks.cohort_tasks.update_not_ordered_cohort",
-            "schedule": crontab(hour=14, minute=42),
+            "schedule": crontab(hour=15, minute=30),
             "options": {"queue": "cohort"}
         },
     
