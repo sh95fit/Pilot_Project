@@ -101,18 +101,18 @@ jobs:
             echo "${{ secrets.REDIS_CONF_TEMPLATE }}" > $CONFIG_DIR/redis.conf.template  # 미사용(envsubst 환경변수 적용 불안정)
             echo '${{ secrets.GOOGLE_KEY_JSON_SALES_BASE64 }}' | base64 -d > "$CONFIG_DIR/lunchlab-sales-11b6cb3593d0.json"
 
+            # UID/GID 자동 감지 및 설정
+            CURRENT_UID=$(id -u)
+            CURRENT_GID=$(id -g)
+            echo "DOCKER_UID=$CURRENT_UID" >> $CONFIG_DIR/main.env
+            echo "DOCKER_GID=$CURRENT_GID" >> $CONFIG_DIR/main.env
+
             chmod 600 $CONFIG_DIR/main.env
             chmod 600 $CONFIG_DIR/ssh_tunnel.pem
             chmod 600 $CONFIG_DIR/private_key.pem
             chmod 600 $CONFIG_DIR/public_key.pem
             chmod 600 $CONFIG_DIR/redis.conf.template
             chmod 600 $CONFIG_DIR/lunchlab-sales-11b6cb3593d0.json
-
-            # UID/GID 자동 감지 및 설정
-            CURRENT_UID=$(id -u)
-            CURRENT_GID=$(id -g)
-            echo "DOCKER_UID=$CURRENT_UID" >> $CONFIG_DIR/main.env
-            echo "DOCKER_GID=$CURRENT_GID" >> $CONFIG_DIR/main.env
 
             # 환경변수를 현재 쉘에도 로드
             export DOCKER_UID=$CURRENT_UID
