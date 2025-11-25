@@ -92,6 +92,10 @@ jobs:
             git fetch pilot main
             git reset --hard pilot/main
 
+            # Git reset 직후 즉시 권한 재설정
+            sudo chown -R ubuntu:ubuntu $CONFIG_DIR
+            sudo chmod 700 $CONFIG_DIR
+
             # 3️⃣ 환경파일 생성 
             umask 077  # 파일 권한을 600으로 설정
             echo "${{ secrets.BUSINESS_MAIN_ENV }}" > $CONFIG_DIR/main.env
@@ -101,18 +105,18 @@ jobs:
             echo "${{ secrets.REDIS_CONF_TEMPLATE }}" > $CONFIG_DIR/redis.conf.template  # 미사용(envsubst 환경변수 적용 불안정)
             echo '${{ secrets.GOOGLE_KEY_JSON_SALES_BASE64 }}' | base64 -d > "$CONFIG_DIR/lunchlab-sales-11b6cb3593d0.json"
 
-            # UID/GID 자동 감지 및 설정
-            CURRENT_UID=$(id -u)
-            CURRENT_GID=$(id -g)
-            echo "DOCKER_UID=$CURRENT_UID" >> $CONFIG_DIR/main.env
-            echo "DOCKER_GID=$CURRENT_GID" >> $CONFIG_DIR/main.env
-
             chmod 600 $CONFIG_DIR/main.env
             chmod 600 $CONFIG_DIR/ssh_tunnel.pem
             chmod 600 $CONFIG_DIR/private_key.pem
             chmod 600 $CONFIG_DIR/public_key.pem
             chmod 600 $CONFIG_DIR/redis.conf.template
             chmod 600 $CONFIG_DIR/lunchlab-sales-11b6cb3593d0.json
+
+            # UID/GID 자동 감지 및 설정
+            CURRENT_UID=$(id -u)
+            CURRENT_GID=$(id -g)
+            echo "DOCKER_UID=$CURRENT_UID" >> $CONFIG_DIR/main.env
+            echo "DOCKER_GID=$CURRENT_GID" >> $CONFIG_DIR/main.env
 
             # 환경변수를 현재 쉘에도 로드
             export DOCKER_UID=$CURRENT_UID
