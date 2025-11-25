@@ -17,7 +17,7 @@ services:
         max-file: "3"
 
   backend:
-    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    user: "${DOCKER_UID:-1001}:${DOCKER_GID:-1001}"
     environment:
       - DEBUG=false
       - LOG_LEVEL=INFO
@@ -41,7 +41,7 @@ services:
         max-file: "5"
 
   frontend:
-    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    user: "${DOCKER_UID:-1001}:${DOCKER_GID:-1001}"
     environment:
       - DEBUG=false
       - LOG_LEVEL=INFO
@@ -65,7 +65,7 @@ services:
         max-file: "5"
 
   celery_worker:
-    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    user: "${DOCKER_UID:-1001}:${DOCKER_GID:-1001}"
     environment:
       - DEBUG=false
       - LOG_LEVEL=INFO
@@ -87,7 +87,7 @@ services:
         max-file: "3"
 
   celery_beat:
-    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    user: "${DOCKER_UID:-1001}:${DOCKER_GID:-1001}"
     environment:
       - DEBUG=false
       - LOG_LEVEL=INFO
@@ -109,7 +109,7 @@ services:
         max-file: "3"
 
   celery_flower:
-    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    user: "${DOCKER_UID:-1001}:${DOCKER_GID:-1001}"
     environment:
       - DEBUG=false
       - LOG_LEVEL=INFO
