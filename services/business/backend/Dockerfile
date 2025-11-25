@@ -60,6 +60,10 @@ CMD ["poetry", "run", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "-
 # =========================
 FROM base AS prod
 
+# ARG 선언만 추가하면 docker-compose의 args가 전달됨
+ARG APP_UID=1001
+ARG APP_GID=1001
+
 RUN poetry config virtualenvs.create false && \
     poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
 
@@ -68,10 +72,18 @@ COPY ./shared/. ./shared
 COPY ./services/business/backend/. ./backend
 
 # 운영 서버는 우분투 서버로 계정이 ubuntu에 맞춰 권한 세팅 (ubuntu uid = 1001) -> 워크플로우에서 동적으로 받아 도커컴포즈에서 user로 할당하도록 변경
-RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
+# RUN adduser --disabled-password --gecos '' appuser && \
+#     chown -R appuser:appuser /app
 
-USER appuser
+# USER appuser
+
+# 동적 UID/GID 사용
+RUN groupadd -g ${APP_GID} appuser && \
+    useradd -u ${APP_UID} -g ${APP_GID} -m -s /bin/bash appuser && \
+    chown -R ${APP_UID}:${APP_GID} /app
+
+USER ${APP_UID}:${APP_GID}
+
 
 EXPOSE 8000
 CMD ["poetry", "run", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

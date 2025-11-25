@@ -85,7 +85,8 @@ RUN groupadd -g ${APP_GID} appuser \
 # HOME 환경 변수 설정 (streamlit이 /app/.streamlit에 접근하도록)
 ENV HOME=/app
 
-USER appuser
+# USER appuser
+USER ${APP_UID}:${APP_GID}
 
 EXPOSE 8501
 CMD ["poetry", "run", "streamlit", "run", "frontend/app/main.py", \
