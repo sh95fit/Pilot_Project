@@ -101,7 +101,7 @@ services:
       - APP_UID=${DOCKER_UID:-1001}
       - APP_GID=${DOCKER_GID:-1001}
     container_name: business_celery_beat
-    command: celery -A backend.app.celery_app.celery_config:celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    command: celery -A backend.app.celery_app.celery_config:celery_app beat --loglevel=info --schedule=/app/tmp/celerybeat-schedule
     environment:
       - TZ=Asia/Seoul
       - PYTHONPATH=/app/backend
@@ -111,7 +111,6 @@ services:
       - business_network
     volumes:
       - ../../../config:/app/config:ro
-      - celery_beat_data:/tmp
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -168,6 +167,4 @@ networks:
 
 volumes:
   redis_data:  
-    driver: local
-  celery_beat_data:
     driver: local
