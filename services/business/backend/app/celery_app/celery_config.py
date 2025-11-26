@@ -42,27 +42,26 @@ celery_app.conf.update(
     
     # Beat 스케줄러 설정
     beat_schedule={
-        # 매일 오후 2시 40 - 미주문 고객사 데이터 업데이트
+        # 매일 오후 2시 35 - 미주문 고객사 데이터 업데이트
         "update-not-ordered-cohort": {
-            "task": "app.celery_app.tasks.cohort_tasks.update_not_ordered_cohort",
+            "task": "cohort_tasks.update_not_ordered_cohort",
             "schedule": crontab(hour=14, minute=35, day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
     
+        # 매일 오후 23시 30분 - 서비스 이용 종료 고객사 데이터 업데이트
+        "update-end-of-use-cohort": {
+            "task": "cohort_tasks.update_end_of_use_cohort",
+            "schedule": crontab(hour=23, minute=30),
+            "options": {"queue": "cohort"}
+        },
         
-        # # 매일 오전 9시 10분 - 서비스 이용 종료 고객사 데이터 업데이트
-        # "update-end-of-use-cohort": {
-        #     "task": "app.celery_app.tasks.cohort_tasks.update_end_of_use_cohort",
-        #     "schedule": crontab(hour=9, minute=10),
-        #     "options": {"queue": "cohort"}
-        # },
-        
-        # # 매일 오후 23시 30분 - 활성 고객 데이터 업데이트
-        # "update-active-customer-cohort": {
-        #     "task": "app.celery_app.tasks.cohort_tasks.update_active_customer_cohort",
-        #     "schedule": crontab(hour=23, minute=30),
-        #     "options": {"queue": "cohort"}
-        # },
+        # 매일 오후 23시 40분 - 활성 고객 데이터 업데이트
+        "update-active-customer-cohort": {
+            "task": "cohort_tasks.update_active_accounts_cohort",
+            "schedule": crontab(hour=23, minute=40),
+            "options": {"queue": "cohort"}
+        },
     },
     
     # 큐 설정
