@@ -10,7 +10,7 @@ class CohortTaskConfig:
     
     NOT_ORDERED = {
         'spreadsheet_id': settings.google_sheet_id_cohort,
-        'worksheet_name': "test_sheet",
+        'worksheet_name': "일별_미주문고객사_DB",
         'procedure_name': "get_daily_not_order_accounts",
         'needs_target_date': True,
         'needs_date_header': True,    
