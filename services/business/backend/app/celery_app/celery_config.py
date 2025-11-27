@@ -2,6 +2,7 @@ from celery import Celery
 from celery.schedules import crontab
 from kombu import Queue, Exchange
 import logging
+from datetime import timedelta
 
 from backend.app.core.config import settings
 
@@ -49,10 +50,10 @@ celery_app.conf.update(
             "options": {"queue": "cohort"}
         },
     
-        # 매일 오후 23시 30분 - 서비스 이용 종료 고객사 데이터 업데이트
+        # 정각 마다 실행(9시~20시 사이) - 서비스 이용 종료 고객사 데이터 업데이트
         "update-end-of-use-cohort": {
             "task": "cohort_tasks.update_end_of_use_cohort",
-            "schedule": crontab(hour=23, minute=30),
+            "schedule": crontab(minute=0, hour="9-20"),
             "options": {"queue": "cohort"}
         },
         
@@ -60,6 +61,13 @@ celery_app.conf.update(
         "update-active-customer-cohort": {
             "task": "cohort_tasks.update_active_accounts_cohort",
             "schedule": crontab(hour=23, minute=40),
+            "options": {"queue": "cohort"}
+        },
+        
+        # 정각 마다 실행(9시~20시 사이) - 어드민 유입 고객 데이터 업데이트트
+        "update-incoming-leads-cohort": {
+            "task": "cohort_tasks.update_incoming_leads_cohort",
+            "schedule": crontab(minute=0, hour="9-20"),
             "options": {"queue": "cohort"}
         },
     },

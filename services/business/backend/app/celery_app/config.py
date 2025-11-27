@@ -32,7 +32,19 @@ class CohortTaskConfig:
         'spreadsheet_id': settings.google_sheet_id_cohort,
         'worksheet_name': "9월_이후_전환_활성고객_DB",
         'procedure_name': "get_available_accounts_cohort",
-        'needs_target_date': True,
-        'needs_date_header': True,    
+        'needs_target_date': False,
+        'needs_date_header': False,    
         "start_cell": "A1"
     }
+    
+    INCOMING_LEADS = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "어드민_유입_리드_DB",
+        'procedure_name': "get_incoming_leads_accounts",
+        'needs_target_date': False,
+        'needs_date_header': True,    
+        "header_range": "A1",
+        "header_merge_cells": 2,
+        "start_cell": "A2"
+    }
+    
