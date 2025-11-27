@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def run_cohort_pipeline(
     task_instance: DatabaseTask,
     config: dict,
-    target_date: str = None
+    target: str = None
 ) -> dict:
     """
     공통 파이프라인: Extract → Transform → Load
@@ -28,14 +28,14 @@ def run_cohort_pipeline(
     Args:
         task_instance: Task 인스턴스 (self)
         config: Task 설정 딕셔너리
-        target_date: 타겟 날짜 (옵션)
+        target: 타겟 날짜 or 제목목 (옵션)
         
     Returns:
         실행 결과 딕셔너리
     """
     try:
         # 1. Extract: MySQL 데이터 추출
-        params = (target_date,) if config["needs_target_date"] and target_date else ()
+        params = (target,) if config["needs_target_date"] and target else ()
         raw_data = task_instance.run_async(
             task_instance.mysql.execute_procedure(
                 config["procedure_name"], params
@@ -61,14 +61,14 @@ def run_cohort_pipeline(
         )
         
         # 날짜 행 포함 업데이트 (필요시)
-        if config["needs_date_header"] and target_date:
+        if config["needs_date_header"] and target:
             header_range = config.get("header_range", "A2")
             merge_cells = config.get("header_merge_cells", 1)
             
             updater.update_header(
                 config["spreadsheet_id"],
                 config["worksheet_name"],
-                target_date,
+                target,
                 header_range=header_range,
                 merge_cells=merge_cells
             )
@@ -89,7 +89,7 @@ def run_cohort_pipeline(
         return {
             "status": "success",
             "count": len(raw_data),
-            "target_date": target_date,
+            "target": target,
             "worksheet": config["worksheet_name"],
             "updated_at": datetime.now().isoformat()
         }
@@ -146,8 +146,8 @@ def update_end_of_use_cohort(self):
     max_retries=3,
     default_retry_delay=300
 )    
-def update_end_of_use_cohort(self):
-    """서비 이용 종료(이탈) 고객사 업데이트"""
+def update_active_accounts_cohort(self):
+    """활성 고객 데이터 업데이트"""
     try:
         return run_cohort_pipeline(
             self,
@@ -156,6 +156,26 @@ def update_end_of_use_cohort(self):
     except Exception as e:
         raise self.retry(exc=e)        
     
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    name="cohort_tasks.update_incoming_leads_cohort",
+    max_retries=3,
+    default_retry_delay=300
+)    
+def update_incoming_leads_cohort(self):
+    """어드민 유입 리드 업데이트"""
+    try:
+        target = "어드민 유입 수"
+        return run_cohort_pipeline(
+            self,
+            CohortTaskConfig.INCOMING_LEADS,
+            target
+        )
+    except Exception as e:
+        raise self.retry(exc=e)        
+        
+
     
     
 # ============================================
