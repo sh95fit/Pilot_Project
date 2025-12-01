@@ -50,10 +50,10 @@ celery_app.conf.update(
             "options": {"queue": "cohort"}
         },
         
-        # 매일 오후 1시 50 - 미주문 고객사 데이터 업데이트
+        # 매일 오전 9시 ~ 오후 13시 30분 사이 30분마다 - 미주문 고객사 데이터 업데이트
         "update-pending-not-ordered-cohort": {
             "task": "cohort_tasks.update_pending_not_ordered_cohort",
-            "schedule": crontab(hour=13, minute=50, day_of_week="1-5"),
+            'schedule': crontab(minute='0,30', hour='9-13'),
             "options": {"queue": "cohort"}
         },
     
