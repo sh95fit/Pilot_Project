@@ -49,6 +49,13 @@ celery_app.conf.update(
             "schedule": crontab(hour=14, minute=35, day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
+        
+        # 매일 오후 1시 50 - 미주문 고객사 데이터 업데이트
+        "update-pending-not-ordered-cohort": {
+            "task": "cohort_tasks.update_pending_not_ordered_cohort",
+            "schedule": crontab(hour=13, minute=50, day_of_week="1-5"),
+            "options": {"queue": "cohort"}
+        },
     
         # 정각 마다 실행(9시~20시 사이) - 서비스 이용 종료 고객사 데이터 업데이트
         "update-end-of-use-cohort": {
@@ -64,7 +71,7 @@ celery_app.conf.update(
             "options": {"queue": "cohort"}
         },
         
-        # 정각 마다 실행(9시~20시 사이) - 어드민 유입 고객 데이터 업데이트트
+        # 정각 마다 실행(9시~20시 사이) - 어드민 유입 고객 데이터 업데이트
         "update-incoming-leads-cohort": {
             "task": "cohort_tasks.update_incoming_leads_cohort",
             "schedule": crontab(minute=0, hour="9-20"),

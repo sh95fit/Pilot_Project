@@ -19,6 +19,18 @@ class CohortTaskConfig:
         "start_cell": "A3"
     }
     
+    PENDING_NOT_ORDERED = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "주문확정전_미주문 고객사",
+        'procedure_name': "get_pending_not_order_accounts",
+        'needs_target_date': True,
+        'needs_date_header': True,    
+        "header_range": "A2:F2",      # 헤더 범위
+        "header_merge_cells": 6,   # 병합셀 개수  
+        "start_cell": "A3"
+    }
+    
+    
     END_OF_USE = {
         'spreadsheet_id': settings.google_sheet_id_cohort,
         'worksheet_name': "이탈유저관리(서비스 이용 종료)",

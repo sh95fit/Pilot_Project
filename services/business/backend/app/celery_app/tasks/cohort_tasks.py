@@ -28,7 +28,7 @@ def run_cohort_pipeline(
     Args:
         task_instance: Task 인스턴스 (self)
         config: Task 설정 딕셔너리
-        target: 타겟 날짜 or 제목목 (옵션)
+        target: 타겟 날짜 or 제목 (옵션)
         
     Returns:
         실행 결과 딕셔너리
@@ -121,6 +121,25 @@ def update_not_ordered_cohort(self):
         )
     except Exception as e:
         raise self.retry(exc=e)
+
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    name="cohort_tasks.update_pending_not_ordered_cohort",
+    max_retries=3,
+    default_retry_delay=300
+)
+def update_pending_not_ordered_cohort(self):
+    """오후 2시 미주문 고객사 업데이트"""
+    try:
+        target_date = get_next_business_date()
+        return run_cohort_pipeline(
+            self, 
+            CohortTaskConfig.PENDING_NOT_ORDERED, 
+            target_date
+        )
+    except Exception as e:
+        raise self.retry(exc=e)
     
 @celery_app.task(
     bind=True,
@@ -130,7 +149,7 @@ def update_not_ordered_cohort(self):
     default_retry_delay=300
 )    
 def update_end_of_use_cohort(self):
-    """서비 이용 종료(이탈) 고객사 업데이트"""
+    """서비스 이용 종료(이탈) 고객사 업데이트"""
     try:
         return run_cohort_pipeline(
             self,
