@@ -14,6 +14,7 @@ class CohortTaskConfig:
         'procedure_name': "get_daily_not_order_accounts",
         'needs_target_date': True,
         'needs_date_header': True,    
+        'needs_period': False,
         "header_range": "A2:E2",      # 헤더 범위
         "header_merge_cells": 5,   # 병합셀 개수  
         "start_cell": "A3"
@@ -24,7 +25,8 @@ class CohortTaskConfig:
         'worksheet_name': "주문확정전_미주문 고객사",
         'procedure_name': "get_pending_not_order_accounts",
         'needs_target_date': True,
-        'needs_date_header': True,    
+        'needs_date_header': True,
+        'needs_period': False,
         "header_range": "A2:F2",      # 헤더 범위
         "header_merge_cells": 6,   # 병합셀 개수  
         "start_cell": "A3"
@@ -37,6 +39,7 @@ class CohortTaskConfig:
         'procedure_name': "get_end_of_use_accounts",
         'needs_target_date': False,
         'needs_date_header': False,    
+        'needs_period': False,
         "start_cell": "A1"
     }
     
@@ -46,6 +49,7 @@ class CohortTaskConfig:
         'procedure_name': "get_available_accounts_cohort",
         'needs_target_date': False,
         'needs_date_header': False,    
+        'needs_period': False,
         "start_cell": "A1"
     }
     
@@ -55,8 +59,21 @@ class CohortTaskConfig:
         'procedure_name': "get_incoming_leads_accounts",
         'needs_target_date': False,
         'needs_date_header': True,    
+        'needs_period': False,
         "header_range": "A1",
         "header_merge_cells": 2,
         "start_cell": "A2"
+    }
+    
+    NOW_ACTIVE_ACCOUNTS = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "활성_고객_DB",
+        'procedure_name': "get_active_accounts_stats",
+        'needs_target_date': False,
+        'needs_date_header': False,    
+        'needs_period': True,
+        "header_range": "A1",
+        "header_merge_cells": 2,
+        "start_cell": "A2",
     }
     
