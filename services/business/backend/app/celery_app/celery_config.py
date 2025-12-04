@@ -77,6 +77,13 @@ celery_app.conf.update(
             "schedule": crontab(minute=0, hour="9-20"),
             "options": {"queue": "cohort"}
         },
+        
+        # 정각 마다 실행(9시~20시 사이) - 현재 활성 고객 데이터 업데이트
+        "update-now-active-accounts-cohort": {
+            "task": "cohort_tasks.update_now_active_accounts_cohort",
+            'schedule': crontab(minute='0,30', hour='9-20', day_of_week="1-5"),
+            "options": {"queue": "cohort"}
+        },
     },
     
     # 큐 설정

@@ -20,7 +20,9 @@ logger = logging.getLogger(__name__)
 def run_cohort_pipeline(
     task_instance: DatabaseTask,
     config: dict,
-    target: str = None
+    target: str = None,
+    start_date: str = None,
+    end_date: str = None
 ) -> dict:
     """
     공통 파이프라인: Extract → Transform → Load
@@ -29,13 +31,33 @@ def run_cohort_pipeline(
         task_instance: Task 인스턴스 (self)
         config: Task 설정 딕셔너리
         target: 타겟 날짜 or 제목 (옵션)
-        
+        start_date: 시작 날짜 (옵션)
+        end_date: 종료 날짜 (옵션)
     Returns:
         실행 결과 딕셔너리
     """
     try:
         # 1. Extract: MySQL 데이터 추출
-        params = (target,) if config["needs_target_date"] and target else ()
+        # 파라미터 결정 로직
+        if config.get("needs_period", False):
+            # 기간 조회 모드
+            if not start_date or not end_date:
+                raise ValueError("needs_period=True requires both start_date and end_date")
+            params = (start_date, end_date)
+            logger.info(f"📅 Period mode: {start_date} ~ {end_date}")
+            
+        elif config.get("needs_target_date", False):
+            # 단일 날짜 조회 모드
+            if not target:
+                raise ValueError("needs_target_date=True requires target parameter")
+            params = (target,)
+            logger.info(f"📅 Single date mode: {target}")
+            
+        else:
+            # 파라미터 없음
+            params = ()
+            logger.info(f"📅 No date parameter mode")
+        
         raw_data = task_instance.run_async(
             task_instance.mysql.execute_procedure(
                 config["procedure_name"], params
@@ -60,15 +82,26 @@ def run_cohort_pipeline(
             config["worksheet_name"]
         )
         
-        # 날짜 행 포함 업데이트 (필요시)
-        if config["needs_date_header"] and target:
+        # 헤더 업데이트 (필요시)
+        if config.get("needs_date_header", False):
             header_range = config.get("header_range", "A2")
             merge_cells = config.get("header_merge_cells", 1)
+            
+            # 헤더 텍스트 결정
+            if config.get("needs_period", False):
+                # 기간 모드: "2024-01-01 ~ 2024-01-31" 형식
+                header_text = f"{start_date} ~ {end_date}"
+            elif config.get("needs_target_date", False):
+                # 단일 날짜 모드
+                header_text = target
+            else:
+                # 기타: 현재 날짜
+                header_text = datetime.now().strftime("%Y-%m-%d")
             
             updater.update_header(
                 config["spreadsheet_id"],
                 config["worksheet_name"],
-                target,
+                header_text,
                 header_range=header_range,
                 merge_cells=merge_cells
             )
@@ -90,6 +123,8 @@ def run_cohort_pipeline(
             "status": "success",
             "count": len(raw_data),
             "target": target,
+            "start_date": start_date,
+            "end_date": end_date,
             "worksheet": config["worksheet_name"],
             "updated_at": datetime.now().isoformat()
         }
@@ -194,7 +229,30 @@ def update_incoming_leads_cohort(self):
     except Exception as e:
         raise self.retry(exc=e)        
         
-
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    name="cohort_tasks.update_now_active_accounts_cohort",
+    max_retries=3,
+    default_retry_delay=300
+)    
+def update_now_active_accounts_cohort(self, start_date=None, end_date=None):
+    """현재 활성 고객 데이터 업데이트"""
+    try:
+        if start_date is None:
+            start_date = "2022-12-01"
+        
+        if end_date is None:
+            end_date = get_next_business_date()
+        
+        return run_cohort_pipeline(
+            self,
+            CohortTaskConfig.NOW_ACTIVE_ACCOUNTS,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except Exception as e:
+        raise self.retry(exc=e)
     
     
 # ============================================
