@@ -259,9 +259,23 @@ def update_now_active_accounts_cohort(self, start_date=None, end_date=None):
     default_retry_delay=300
 )    
 def update_product_sales_summary_cohort(self):
-    """일별 상품별 주문 수량량 데이터 업데이트"""
+    """일별 상품별 주문 수량 데이터 업데이트"""
     try:
         return run_cohort_pipeline(self, CohortTaskConfig.PRODUCT_SALES_SUMMARY)
+    except Exception as e:
+        raise self.retry(exc=e)
+
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    name="cohort_tasks.update_account_orders_summary_cohort",
+    max_retries=3,
+    default_retry_delay=300
+)    
+def update_account_orders_summary_cohort(self):
+    """고객사별 주문 현황 데이터 업데이트"""
+    try:
+        return run_cohort_pipeline(self, CohortTaskConfig.ACCOUNT_ORDERS_SUMMARY)
     except Exception as e:
         raise self.retry(exc=e)
     
