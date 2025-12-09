@@ -162,8 +162,8 @@ class MySQLClient:
                 db=db_name,
                 charset="utf8mb4",
                 autocommit=True,
-                minsize=5,
-                maxsize=20,
+                minsize=1,
+                maxsize=5,
                 echo=getattr(settings, "debug", False),
                 pool_recycle=3600
             )
