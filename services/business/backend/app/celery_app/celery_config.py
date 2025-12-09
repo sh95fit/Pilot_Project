@@ -64,45 +64,45 @@ celery_app.conf.update(
     
     # Beat 스케줄러 설정
     beat_schedule={
-        # 매일 오후 2시 35 - 미주문 고객사 데이터 업데이트
+        # 미주문 고객사 데이터 업데이트
         "update-not-ordered-cohort": {
             "task": "cohort_tasks.update_not_ordered_cohort",
             "schedule": crontab(hour=14, minute=35, day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
         
-        # 매일 오전 9시 ~ 오후 13시 30분 사이 30분마다 - 미주문 고객사 데이터 업데이트
+        # 미주문 고객사 데이터 업데이트
         "update-pending-not-ordered-cohort": {
             "task": "cohort_tasks.update_pending_not_ordered_cohort",
             'schedule': crontab(minute='0,30', hour='9-14', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
     
-        # 정각 마다 실행(9시~20시 사이) - 서비스 이용 종료 고객사 데이터 업데이트
+        # 서비스 이용 종료 고객사 데이터 업데이트
         "update-end-of-use-cohort": {
             "task": "cohort_tasks.update_end_of_use_cohort",
-            'schedule': crontab(minute='0,30', hour='9-20', day_of_week="1-5"),
+            'schedule': crontab(minute='1,31', hour='9-20', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
         
-        # 정각 마다 실행(9시~20시 사이) - 활성 고객 데이터 업데이트
+        # 활성 고객 데이터 업데이트
         "update-active-customer-cohort": {
             "task": "cohort_tasks.update_active_accounts_cohort",
-            'schedule': crontab(minute='0,30', hour='9-20', day_of_week="1-5"),
+            'schedule': crontab(minute='2,32', hour='9-20', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
         
-        # 정각 마다 실행(9시~20시 사이) - 어드민 유입 고객 데이터 업데이트
+        # 어드민 유입 고객 데이터 업데이트
         "update-incoming-leads-cohort": {
             "task": "cohort_tasks.update_incoming_leads_cohort",
-            "schedule": crontab(minute=0, hour="9-20"),
+            "schedule": crontab(minute='3,33', hour="9-20", day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
         
         # 정각 마다 실행(9시~20시 사이) - 현재 활성 고객 데이터 업데이트
         "update-now-active-accounts-cohort": {
             "task": "cohort_tasks.update_now_active_accounts_cohort",
-            'schedule': crontab(minute='0,30', hour='9-20', day_of_week="1-5"),
+            'schedule': crontab(minute='4,34', hour='9-20', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
         
