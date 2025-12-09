@@ -6,6 +6,12 @@ from datetime import timedelta
 
 from backend.app.core.config import settings
 
+# 워커 종료 시 처리 목적
+from celery.signals import worker_shutdown
+import asyncio
+from backend.app.core.database.mysql_client import mysql_client
+
+
 logger = logging.getLogger(__name__)
 
 # Celery 앱 생성
@@ -103,3 +109,20 @@ celery_app.conf.update(
 )
 
 logger.info("✅ Celery app configured successfully")    
+
+
+# 워커 종료 시 모든 aiomysql pool 종료, 모든 Mysql Connection 반환, SSH Tunnel 종료
+@worker_shutdown.connect
+def close_mysql_on_worker_shutdown(sig=None, how=None, exitcode=None, **kwargs):
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    if loop.is_running():
+        loop.create_task(mysql_client.close())
+    else:
+        loop.run_until_complete(mysql_client.close())
+
+    print("✅ Celery worker shutdown: MySQL connection fully closed")
