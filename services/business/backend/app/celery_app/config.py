@@ -77,3 +77,12 @@ class CohortTaskConfig:
         "start_cell": "A2",
     }
     
+    PRODUCT_SALES_SUMMARY = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "일별_상품별_주문이력_DB",
+        'procedure_name': "get_daily_product_sales_summary",
+        'needs_target_date': False,
+        'needs_date_header': False,    
+        'needs_period': False,
+        "start_cell": "A1",
+    }

@@ -74,42 +74,50 @@ celery_app.conf.update(
         # 미주문 고객사 데이터 업데이트
         "update-pending-not-ordered-cohort": {
             "task": "cohort_tasks.update_pending_not_ordered_cohort",
-            'schedule': crontab(minute='0,30', hour='9-14', day_of_week="1-5"),
+            'schedule': crontab(minute='0,20,40', hour='9-14', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
     
         # 서비스 이용 종료 고객사 데이터 업데이트
         "update-end-of-use-cohort": {
             "task": "cohort_tasks.update_end_of_use_cohort",
-            'schedule': crontab(minute='1,31', hour='9-20', day_of_week="1-5"),
+            'schedule': crontab(minute='1,21,41', hour='9-20', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
         
         # 활성 고객 데이터 업데이트
         "update-active-customer-cohort": {
             "task": "cohort_tasks.update_active_accounts_cohort",
-            'schedule': crontab(minute='2,32', hour='9-20', day_of_week="1-5"),
+            'schedule': crontab(minute='2,22,44', hour='9-20', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
         
         # 어드민 유입 고객 데이터 업데이트
         "update-incoming-leads-cohort": {
             "task": "cohort_tasks.update_incoming_leads_cohort",
-            "schedule": crontab(minute='3,33', hour="9-20", day_of_week="1-5"),
+            "schedule": crontab(minute='3,23,43', hour="9-20", day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
         
-        # 정각 마다 실행(9시~20시 사이) - 현재 활성 고객 데이터 업데이트
+        # 현재 활성 고객 데이터 업데이트
         "update-now-active-accounts-cohort": {
             "task": "cohort_tasks.update_now_active_accounts_cohort",
-            'schedule': crontab(minute='4,34', hour='9-20', day_of_week="1-5"),
+            'schedule': crontab(minute='4,24,44', hour='9-20', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
         
-        # MySQL 연결 모니터링 (10분마다)
+        # 상품별 주문 수량 데이터 업데이트        
+        "update-product-sales-summary": {
+            "task": "cohort_tasks.update_product_sales_summary_cohort",
+            "schedule": crontab(minute='5,20,35,50'),
+            "options": {"queue": "cohort"}
+        },
+        
+        
+        # MySQL 연결 모니터링 (30분마다)
         "monitor-mysql-health": {
             "task": "cohort_tasks.monitor_mysql_health",
-            "schedule": timedelta(minutes=10),
+            "schedule": timedelta(minutes=30),
             "options": {"queue": "cohort"}
         },
     },
