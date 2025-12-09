@@ -1,11 +1,13 @@
 """
 코호트 Task 정의
-각 Task는 설정을 가져와 파이프라인을 조립하는 역할만 수행
+- DatabaseTask 기반으로 MySQL/Sheets 작업 수행
+- 공통 파이프라인 재사용
 """
 import logging
+import asyncio
 from datetime import datetime
 
-from backend.app.celery_app.celery_config import celery_app
+from backend.app.celery_app.celery_config import celery_app, get_mysql_pool_stats
 from backend.app.celery_app.config import CohortTaskConfig
 from backend.app.celery_app.tasks.base import DatabaseTask
 from backend.app.celery_app.tasks.utils.data_processor import (
@@ -13,9 +15,15 @@ from backend.app.celery_app.tasks.utils.data_processor import (
     get_next_business_date
 )
 from backend.app.celery_app.tasks.utils.sheets_updater import SheetsUpdater
+from backend.app.core.database.mysql_client import mysql_client
+
 
 logger = logging.getLogger(__name__)
 
+
+# =============================================================================
+# 공통 파이프라인
+# =============================================================================
 
 def run_cohort_pipeline(
     task_instance: DatabaseTask,
@@ -28,17 +36,18 @@ def run_cohort_pipeline(
     공통 파이프라인: Extract → Transform → Load
     
     Args:
-        task_instance: Task 인스턴스 (self)
+        task_instance: DatabaseTask 인스턴스 (self)
         config: Task 설정 딕셔너리
         target: 타겟 날짜 or 제목 (옵션)
         start_date: 시작 날짜 (옵션)
         end_date: 종료 날짜 (옵션)
+        
     Returns:
         실행 결과 딕셔너리
     """
     try:
         # 1. Extract: MySQL 데이터 추출
-        # 파라미터 결정 로직
+        # 파라미터 결정
         if config.get("needs_period", False):
             # 기간 조회 모드
             if not start_date or not end_date:
@@ -52,20 +61,22 @@ def run_cohort_pipeline(
                 raise ValueError("needs_target_date=True requires target parameter")
             params = (target,)
             logger.info(f"📅 Single date mode: {target}")
-            
+                        
         else:
             # 파라미터 없음
             params = ()
-            logger.info(f"📅 No date parameter mode")
+            logger.info(f"📅 No parameter mode")
         
+        # MySQL 프로시저 실행
         raw_data = task_instance.run_async(
             task_instance.mysql.execute_procedure(
-                config["procedure_name"], params
+                config["procedure_name"], 
+                params
             )
         )
         
         if not raw_data:
-            logger.warning(f"⚠️ No data: {config['worksheet_name']}")
+            logger.warning(f"⚠️ No data returned: {config['worksheet_name']}")
             return {"status": "no_data", "count": 0}
         
         logger.info(f"📥 Extracted {len(raw_data)} records from MySQL")
@@ -73,7 +84,7 @@ def run_cohort_pipeline(
         # 2. Transform: 데이터 변환
         sheet_data = DataProcessor.to_sheets_format(raw_data)
         
-        # 3. Load: Sheets 업데이트
+        # 3. Load: Google Sheets 업데이트
         updater = SheetsUpdater(task_instance.sheets, task_instance.run_async)
         
         # 기존 데이터 초기화
@@ -108,8 +119,8 @@ def run_cohort_pipeline(
         
         # 데이터 삽입
         start_cell = config["start_cell"]
+        logger.info(f"📤 Inserting {len(sheet_data)} rows to Sheets")
         
-        logger.info(f"📤 Inserting {len(sheet_data)} rows (header + {len(sheet_data)-1} data rows)")
         updater.insert_data(
             config["spreadsheet_id"],
             config["worksheet_name"],
@@ -117,7 +128,7 @@ def run_cohort_pipeline(
             start_cell
         )
         
-        logger.info(f"✅ {config['worksheet_name']}: {len(raw_data)} rows")
+        logger.info(f"✅ {config['worksheet_name']}: {len(raw_data)} rows updated")
         
         return {
             "status": "success",
@@ -130,13 +141,13 @@ def run_cohort_pipeline(
         }
         
     except Exception as e:
-        logger.error(f"❌ Pipeline failed: {e}", exc_info=True)
+        logger.error(f"❌ Pipeline failed for {config.get('worksheet_name', 'unknown')}: {e}", exc_info=True)
         raise
 
 
-# ============================================
-# Task 정의 (설정만 조립)
-# ============================================
+# =============================================================================
+# Cohort Task 정의
+# =============================================================================
 
 @celery_app.task(
     bind=True,
@@ -149,13 +160,10 @@ def update_not_ordered_cohort(self):
     """미주문 고객사 업데이트"""
     try:
         target_date = get_next_business_date()
-        return run_cohort_pipeline(
-            self, 
-            CohortTaskConfig.NOT_ORDERED, 
-            target_date
-        )
+        return run_cohort_pipeline(self, CohortTaskConfig.NOT_ORDERED, target_date)
     except Exception as e:
         raise self.retry(exc=e)
+
 
 @celery_app.task(
     bind=True,
@@ -168,14 +176,11 @@ def update_pending_not_ordered_cohort(self):
     """오후 2시 미주문 고객사 업데이트"""
     try:
         target_date = get_next_business_date()
-        return run_cohort_pipeline(
-            self, 
-            CohortTaskConfig.PENDING_NOT_ORDERED, 
-            target_date
-        )
+        return run_cohort_pipeline(self, CohortTaskConfig.PENDING_NOT_ORDERED, target_date)
     except Exception as e:
         raise self.retry(exc=e)
-    
+
+
 @celery_app.task(
     bind=True,
     base=DatabaseTask,
@@ -186,12 +191,10 @@ def update_pending_not_ordered_cohort(self):
 def update_end_of_use_cohort(self):
     """서비스 이용 종료(이탈) 고객사 업데이트"""
     try:
-        return run_cohort_pipeline(
-            self,
-            CohortTaskConfig.END_OF_USE,
-        )
+        return run_cohort_pipeline(self, CohortTaskConfig.END_OF_USE)
     except Exception as e:
-        raise self.retry(exc=e)    
+        raise self.retry(exc=e)
+
 
 @celery_app.task(
     bind=True,
@@ -203,13 +206,11 @@ def update_end_of_use_cohort(self):
 def update_active_accounts_cohort(self):
     """활성 고객 데이터 업데이트"""
     try:
-        return run_cohort_pipeline(
-            self,
-            CohortTaskConfig.ACTIVE_ACCOUNTS,
-        )
+        return run_cohort_pipeline(self, CohortTaskConfig.ACTIVE_ACCOUNTS)
     except Exception as e:
-        raise self.retry(exc=e)        
-    
+        raise self.retry(exc=e)
+
+
 @celery_app.task(
     bind=True,
     base=DatabaseTask,
@@ -221,14 +222,11 @@ def update_incoming_leads_cohort(self):
     """어드민 유입 리드 업데이트"""
     try:
         target = "어드민 유입 수"
-        return run_cohort_pipeline(
-            self,
-            CohortTaskConfig.INCOMING_LEADS,
-            target
-        )
+        return run_cohort_pipeline(self, CohortTaskConfig.INCOMING_LEADS, target)
     except Exception as e:
-        raise self.retry(exc=e)        
-        
+        raise self.retry(exc=e)
+
+
 @celery_app.task(
     bind=True,
     base=DatabaseTask,
@@ -241,7 +239,6 @@ def update_now_active_accounts_cohort(self, start_date=None, end_date=None):
     try:
         if start_date is None:
             start_date = "2022-12-01"
-        
         if end_date is None:
             end_date = get_next_business_date()
         
@@ -289,3 +286,103 @@ def update_now_active_accounts_cohort(self, start_date=None, end_date=None):
 
 끝! 파이프라인 로직은 재사용
 """
+
+
+
+# =============================================================================
+# MySQL 연결 모니터링 Task
+# =============================================================================
+
+@celery_app.task(
+    bind=True,
+    name="cohort_tasks.monitor_mysql_health",
+    max_retries=0
+)
+def monitor_mysql_health(self):
+    """
+    MySQL 연결 상태 및 Pool 사용률 모니터링
+    - SSH Tunnel 상태 확인
+    - Connection Pool 사용률 확인
+    - 80% 이상 사용 시 경고
+    """
+    
+    async def _async_monitor():
+        """비동기 모니터링 로직"""
+        try:
+            # 1. Pool 통계 수집
+            stats = get_mysql_pool_stats()
+            
+            # 2. SSH 터널 상태 확인
+            ssh_status = stats.get("ssh_tunnel", {})
+            if not ssh_status.get("active"):
+                logger.error("❌ SSH Tunnel is NOT active!")
+                return {"status": "error", "message": "SSH tunnel inactive"}
+            
+            logger.info(f"✅ SSH Tunnel active on port {ssh_status.get('local_port')}")
+            
+            # 3. 각 Pool 상태 확인
+            pool_warnings = []
+            pools_data = stats.get("pools", {})
+            
+            for db_name, pool_stats in pools_data.items():
+                usage = pool_stats.get("usage_percent", 0)
+                logger.info(
+                    f"📊 Pool [{db_name}] - "
+                    f"Size: {pool_stats['size']}/{pool_stats['maxsize']}, "
+                    f"Free: {pool_stats['freesize']}, "
+                    f"In-use: {pool_stats['in_use']}, "
+                    f"Usage: {usage}%"
+                )
+                
+                # 사용률 80% 이상 시 경고
+                if usage >= 80:
+                    warning_msg = (
+                        f"High connection usage for {db_name}: {usage}%! "
+                        f"Consider increasing maxsize or checking for connection leaks."
+                    )
+                    logger.warning(f"⚠️ {warning_msg}")
+                    pool_warnings.append(warning_msg)
+            
+            # 4. Health check 수행
+            is_healthy = await mysql_client.health_check()
+            
+            if not is_healthy:
+                logger.error("❌ MySQL health check failed!")
+                return {
+                    "status": "unhealthy",
+                    "ssh_tunnel": ssh_status,
+                    "pools": pools_data,
+                    "warnings": pool_warnings
+                }
+            
+            logger.info("✅ MySQL health check passed")
+            return {
+                "status": "healthy",
+                "ssh_tunnel": ssh_status,
+                "pools": pools_data,
+                "warnings": pool_warnings
+            }
+        
+        except Exception as e:
+            logger.error(f"❌ Error in MySQL monitoring: {e}", exc_info=True)
+            return {"status": "error", "message": str(e)}
+    
+    # 메인 실행 로직
+    try:
+        # Event loop 안전하게 가져오기
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # 비동기 모니터링 실행
+        result = loop.run_until_complete(_async_monitor())
+        return result
+    
+    except Exception as e:
+        logger.error(f"❌ Failed to execute monitoring task: {e}", exc_info=True)
+        return {"status": "error", "message": str(e)}
