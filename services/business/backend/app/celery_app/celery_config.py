@@ -113,6 +113,13 @@ celery_app.conf.update(
             "options": {"queue": "cohort"}
         },
         
+        # 상품별 주문 수량 데이터 업데이트        
+        "update-account-orders-summary": {
+            "task": "cohort_tasks.update_account_orders_summary_cohort",
+            "schedule": crontab(minute='6, 36'),
+            "options": {"queue": "cohort"}
+        },
+        
         
         # MySQL 연결 모니터링 (30분마다)
         "monitor-mysql-health": {
