@@ -11,11 +11,11 @@ from backend.app.core.config import settings
 
 # 워커 라이프사이클 시그널
 from celery.signals import (
-    worker_process_init, 
-    worker_process_shutdown,
-    task_prerun,
-    task_postrun,
-    task_failure
+    worker_process_init, # Worker 프로세스 최초 시작 시 1회만 수행 (Mysql 초기화, SSH Tunnel 생성)
+    worker_process_shutdown, # Worker 종료 시 1회만 수행 (모든 연결 정리, SSH Tunnel 닫기)
+    task_prerun, # Task 실행 직전마다 수행 (연결 상태 확인, 필요시 재연결)
+    task_postrun, # Task 성공 시 수행 (Pool 사용률 체크)
+    task_failure # Task 실패 시 수행 (에러 원인 분석)
 )
 import asyncio
 from backend.app.core.database.mysql_client import mysql_client
@@ -106,10 +106,10 @@ celery_app.conf.update(
             "options": {"queue": "cohort"}
         },
         
-        # MySQL 연결 모니터링 (5분마다)
+        # MySQL 연결 모니터링 (10분마다)
         "monitor-mysql-health": {
             "task": "cohort_tasks.monitor_mysql_health",
-            "schedule": timedelta(minutes=5),
+            "schedule": timedelta(minutes=10),
             "options": {"queue": "cohort"}
         },
     },
@@ -342,8 +342,8 @@ def get_mysql_pool_stats() -> dict:
         
         # 각 DB Pool 통계
         for db_name, pool in mysql_client.pools.items():
-            size = pool.size()
-            freesize = pool.freesize()
+            size = pool.size
+            freesize = pool.freesize
             maxsize = pool.maxsize
             
             stats["pools"][db_name] = {
@@ -366,3 +366,62 @@ def get_mysql_pool_stats() -> dict:
     except Exception as e:
         logger.error(f"Error getting pool stats: {e}", exc_info=True)
         return {"error": str(e)}
+    
+    
+#########################
+# 실제 흐름 예시
+#########################
+# 1. Worker 시작
+# $ celery -A backend.app.celery_app.celery_config worker
+
+# → worker_process_init 실행
+#   ✅ SSH Tunnel 생성
+#   ✅ Event Loop 설정
+#   (로그) "Worker started: MySQL client initialized"
+
+# # 2. Task 1 실행: update_not_ordered_cohort
+# → task_prerun 실행
+#   ✅ Health check 수행
+#   ✅ 연결 정상
+#   (로그) "MySQL healthy, starting task"
+
+# → Task 실행
+#   📥 MySQL에서 데이터 추출
+#   🔄 데이터 변환
+#   📤 Google Sheets 업데이트
+
+# → task_postrun 실행
+#   ✅ Pool 사용률 체크: 40%
+#   (로그) "Pool usage: 2/5 connections"
+
+# # 3. Task 2 실행: update_active_accounts_cohort
+# → task_prerun 실행
+#   ⚠️ Health check 실패
+#   🔄 자동 재연결 시도
+#   ✅ 재연결 성공
+#   (로그) "MySQL reconnected successfully"
+
+# → Task 실행
+#   (성공)
+
+# → task_postrun 실행
+#   (정상)
+
+# # 4. Task 3 실행: update_incoming_leads_cohort
+# → task_prerun 실행
+#   (정상)
+
+# → Task 실행
+#   ❌ 예외 발생: ValueError
+
+# → task_failure 실행
+#   (로그) "Task failed (non-connection error)"
+  
+# # 5. Worker 종료
+# $ Ctrl+C
+
+# → worker_process_shutdown 실행
+#   ✅ 모든 Connection Pool 닫기
+#   ✅ SSH Tunnel 종료
+#   ✅ Event Loop 정리
+#   (로그) "MySQL connection pools and SSH tunnel closed"
