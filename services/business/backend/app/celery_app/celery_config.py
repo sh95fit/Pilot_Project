@@ -342,17 +342,30 @@ def get_mysql_pool_stats() -> dict:
         
         # 각 DB Pool 통계
         for db_name, pool in mysql_client.pools.items():
-            size = pool.size
-            freesize = pool.freesize
-            maxsize = pool.maxsize
-            
-            stats["pools"][db_name] = {
-                "size": size,
-                "freesize": freesize,
-                "in_use": size - freesize,
-                "maxsize": maxsize,
-                "usage_percent": round((1 - freesize / maxsize) * 100, 2) if maxsize > 0 else 0
-            }
+            # aiomysql Pool의 실제 속성 확인
+            # size()와 freesize()는 메서드입니다
+            try:
+                size = pool.size()  # 현재 생성된 연결 수
+                freesize = pool.freesize()  # 사용 가능한 연결 수
+                maxsize = pool.maxsize  # 최대 연결 수 (속성)
+                minsize = pool.minsize  # 최소 연결 수 (속성)
+                
+                in_use = size - freesize
+                usage_percent = round((in_use / maxsize) * 100, 2) if maxsize > 0 else 0
+                
+                stats["pools"][db_name] = {
+                    "size": size,
+                    "freesize": freesize,
+                    "in_use": in_use,
+                    "minsize": minsize,
+                    "maxsize": maxsize,
+                    "usage_percent": usage_percent
+                }
+            except AttributeError as ae:
+                logger.warning(f"Pool {db_name} attribute error: {ae}")
+                # Pool 객체의 실제 속성 로깅 (디버깅용)
+                logger.debug(f"Available pool attributes: {dir(pool)}")
+                stats["pools"][db_name] = {"error": "Unable to read pool stats"}
         
         # SSH 터널 상태
         stats["ssh_tunnel"] = {
