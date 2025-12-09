@@ -207,7 +207,7 @@ def monitor_pool_usage_after_task(task_id, task, retval, *args, **kwargs):
             return
         
         for db_name, pool in mysql_client.pools.items():
-            in_use = pool.size() - pool.freesize()
+            in_use = pool.size - pool.freesize
             usage_percent = (in_use / pool.maxsize) * 100 if pool.maxsize > 0 else 0
             
             if usage_percent >= 80:
@@ -345,8 +345,8 @@ def get_mysql_pool_stats() -> dict:
             # aiomysql Pool의 실제 속성 확인
             # size()와 freesize()는 메서드입니다
             try:
-                size = pool.size()  # 현재 생성된 연결 수
-                freesize = pool.freesize()  # 사용 가능한 연결 수
+                size = pool.size  # 현재 생성된 연결 수
+                freesize = pool.freesize  # 사용 가능한 연결 수
                 maxsize = pool.maxsize  # 최대 연결 수 (속성)
                 minsize = pool.minsize  # 최소 연결 수 (속성)
                 
