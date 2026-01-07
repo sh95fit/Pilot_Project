@@ -20,7 +20,7 @@ def fetch_metric_dashboard(base_url: str, start_period: str, end_period: str):
     }
     url = f"{base_url}/api/v1/google-sheets/metric-dashboard/period"
     payload = {
-        "worksheet_name": "Metric_Dashboard",
+        "worksheet_name": "System_Matrix",
         "start_period": start_period,
         "end_period": end_period
     }
@@ -208,10 +208,12 @@ def show_operations_dashboard():
         lead_count = df_kpi['lead_count'].sum()
         trial_conversion = df_kpi['trial_conversion'].sum()
         subscription_conversion = df_kpi['subscription_conversion'].sum()
+        end_of_use_count = df_kpi['end_of_use_count'].sum()
     else:
         lead_count = 0
         trial_conversion = 0
         subscription_conversion = 0
+        end_of_use_count = 0
         
     st.markdown("""
     <style>
@@ -239,8 +241,7 @@ def show_operations_dashboard():
     </style>
     """, unsafe_allow_html=True)
         
-    kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5, kpi_col6 = st.columns([1, 1, 1, 1,1,1], gap="medium")
-    
+    kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5, kpi_col6, kpi_col7 = st.columns([1, 1, 1, 1, 1, 1, 1], gap="medium")
     with kpi_col1:
         st.markdown(f"""
         <div class="kpi-card">
@@ -268,6 +269,14 @@ def show_operations_dashboard():
     with kpi_col4:
         st.markdown(f"""
         <div class="kpi-card">
+            <div class="kpi-card-title">이탈수</div>
+            <div class="kpi-card-value">{end_of_use_count:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with kpi_col5:
+        st.markdown(f"""
+        <div class="kpi-card">
             <div class="kpi-card-title">활성 계정 수</div>
             <div class="kpi-card-value">{active_accounts:,}</div>
         </div>
@@ -286,7 +295,7 @@ def show_operations_dashboard():
         home_meal_amount = 0
         freshmeal_amount = 0
         
-    with kpi_col5:
+    with kpi_col6:
         st.markdown(f"""
         <div class="kpi-card">
             <div class="kpi-card-title">가정식 판매 현황</div>
@@ -294,7 +303,7 @@ def show_operations_dashboard():
         </div>
         """, unsafe_allow_html=True)
 
-    with kpi_col6:
+    with kpi_col7:
         st.markdown(f"""
         <div class="kpi-card">
             <div class="kpi-card-title">프레시밀 판매 현황</div>
@@ -375,7 +384,8 @@ def show_operations_dashboard():
             column_map = {
                 "lead_count": "유입 리드 수",
                 "trial_conversion": "체험 전환 수",
-                "subscription_conversion": "구독 전환 수"
+                "subscription_conversion": "구독 전환 수",
+                "end_of_use_count": "이탈수"
             }
             
             melted_df = df_chart.melt(
@@ -388,7 +398,7 @@ def show_operations_dashboard():
             melted_df["지표"] = melted_df["지표"].map(column_map)
             melted_df["지표"] = pd.Categorical(
                 melted_df["지표"],
-                categories=["유입 리드 수", "체험 전환 수", "구독 전환 수"],
+                categories=["유입 리드 수", "체험 전환 수", "구독 전환 수", "이탈수"],
                 ordered=True
             )
             
@@ -398,8 +408,8 @@ def show_operations_dashboard():
                 .encode(
                     x=alt.X("month:O", title="월", axis=alt.Axis(labelAngle=0)),
                     y=alt.Y("값:Q", title="수"),
-                    color=alt.Color("지표:N", title="지표", sort=["유입 리드 수", "체험 전환 수", "구독 전환 수"]),
-                    xOffset=alt.XOffset("지표:N", sort=["유입 리드 수", "체험 전환 수", "구독 전환 수"]),
+                    color=alt.Color("지표:N", title="지표", sort=["유입 리드 수", "체험 전환 수", "구독 전환 수", "이탈수"]),
+                    xOffset=alt.XOffset("지표:N", sort=["유입 리드 수", "체험 전환 수", "구독 전환 수", "이탈수"]),
                     tooltip=["period", "지표", "값"]
                 )
             )
@@ -417,7 +427,7 @@ def show_operations_dashboard():
                     x=alt.X("month:O"),
                     y=alt.Y("값:Q"),
                     text=alt.Text("값:Q"),
-                    xOffset=alt.XOffset("지표:N", sort=["유입 리드 수", "체험 전환 수", "구독 전환 수"])
+                    xOffset=alt.XOffset("지표:N", sort=["유입 리드 수", "체험 전환 수", "구독 전환 수", "이탈수"])
                 )
             )
             
@@ -429,8 +439,8 @@ def show_operations_dashboard():
             st.altair_chart(chart, use_container_width=True)
             
             with st.expander("📋 상세 데이터 보기", expanded=False):
-                display_df = df_chart[["period", "lead_count", "trial_conversion", "subscription_conversion"]].copy()
-                display_df.columns = ["기간", "유입 리드 수", "체험 전환 수", "구독 전환 수"]
+                display_df = df_chart[["period", "lead_count", "trial_conversion", "subscription_conversion", "end_of_use_count"]].copy()
+                display_df.columns = ["기간", "유입 리드 수", "체험 전환 수", "구독 전환 수", "이탈수"]
                 display_df["기간"] = pd.to_datetime(display_df["기간"]).dt.strftime('%Y-%m')
                 
                 st.dataframe(

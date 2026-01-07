@@ -69,11 +69,16 @@ class GoogleSheetsRepository(BaseRepository[Dict[str, Any]]):
                     column_mapping[col] = 'subscription_conversion'
                     break
             
+            for col in df.columns:
+                if col in ['end_of_use', 'end_of_use_count', '이탈수', '이탈']:
+                    column_mapping[col] = 'end_of_use_count'
+                    break
+            
             # 컬럼명 변경
             df = df.rename(columns=column_mapping)
             
             # 필요한 컬럼만 선택
-            required_columns = ['period', 'lead_count', 'trial_conversion', 'subscription_conversion']
+            required_columns = ['period', 'lead_count', 'trial_conversion', 'subscription_conversion', 'end_of_use_count']
             for col in required_columns:
                 if col not in df.columns:
                     df[col] = 0
@@ -87,7 +92,7 @@ class GoogleSheetsRepository(BaseRepository[Dict[str, Any]]):
             df = df[df['period'].str.match(r'^\d{4}-\d{2}$', na=False)]
             
             # 숫자 컬럼 변환
-            numeric_columns = ['lead_count', 'trial_conversion', 'subscription_conversion']
+            numeric_columns = ['lead_count', 'trial_conversion', 'subscription_conversion', 'end_of_use_count']
             for col in numeric_columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
             

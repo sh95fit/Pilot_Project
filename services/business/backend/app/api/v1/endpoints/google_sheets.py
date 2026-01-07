@@ -55,7 +55,7 @@ async def get_all_metric_dashboard(
     spreadsheet_id는 환경변수에서 자동으로 가져옵니다
     """
     try:
-        spreadsheet_id = settings.google_sheet_id_sales
+        spreadsheet_id = settings.google_sheet_id_cohort
         if not spreadsheet_id:
             raise HTTPException(status_code=500, detail="Spreadsheet ID not configured")
         
@@ -78,7 +78,7 @@ async def get_metric_dashboard_by_period(
     spreadsheet_id는 환경변수에서 자동으로 가져옵니다
     """
     try:
-        spreadsheet_id = settings.google_sheet_id_sales
+        spreadsheet_id = settings.google_sheet_id_cohort
         if not spreadsheet_id:
             raise HTTPException(status_code=500, detail="Spreadsheet ID not configured")
         
