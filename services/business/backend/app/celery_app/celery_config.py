@@ -123,7 +123,7 @@ celery_app.conf.update(
         # 체험 고객사 데이터 업데이트
         "update-trial-accounts-cohort": {
             "task": "cohort_tasks.update_trial_accounts_cohort",
-            "schedule": crontab(minute='7, 14, 27, 47'),
+            "schedule": crontab(minute='7, 27, 47'),
             "options": {"queue": "cohort"}
         },
         
