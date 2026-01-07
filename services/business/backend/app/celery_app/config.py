@@ -109,7 +109,7 @@ class CohortTaskConfig:
     
     LEAD_APPLICATIONS = {
         'spreadsheet_id': settings.google_sheet_id_cohort,
-        'worksheet_name': "고객유입리드",
+        'worksheet_name': "고객유입리드_DB",
         'procedure_name': "call get_lead_applications_list",
         'needs_target_date': False,
         'needs_date_header': False,    
