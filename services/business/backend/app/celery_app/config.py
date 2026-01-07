@@ -96,3 +96,13 @@ class CohortTaskConfig:
         'needs_period': False,
         "start_cell": "A1",
     }
+    
+    TRIAL_ACCOUNTS = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "체험_고객사_DB",
+        'procedure_name': "get_trial_accounts",
+        'needs_target_date': False,
+        'needs_date_header': False,    
+        'needs_period': False,
+        "start_cell": "A1",
+    }

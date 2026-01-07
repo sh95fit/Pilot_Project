@@ -113,10 +113,17 @@ celery_app.conf.update(
             "options": {"queue": "cohort"}
         },
         
-        # 상품별 주문 수량 데이터 업데이트        
+        # 고객사 단위 상품별 주문 수량 데이터 업데이트        
         "update-account-orders-summary": {
             "task": "cohort_tasks.update_account_orders_summary_cohort",
-            "schedule": crontab(minute='6, 36'),
+            "schedule": crontab(minute='6, 26, 46'),
+            "options": {"queue": "cohort"}
+        },
+        
+        # 체험 고객사 데이터 업데이트
+        "update-trial-accounts-cohort": {
+            "task": "cohort_tasks.update_trial_accounts_cohort",
+            "schedule": crontab(minute='7, 27, 47'),
             "options": {"queue": "cohort"}
         },
         

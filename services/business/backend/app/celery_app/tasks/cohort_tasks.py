@@ -280,6 +280,21 @@ def update_account_orders_summary_cohort(self):
         raise self.retry(exc=e)
     
     
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    name="cohort_tasks.update_trial_accounts_cohort",
+    max_retries=3,
+    default_retry_delay=300
+)    
+def update_trial_accounts_cohort(self):
+    """체험 고객사 데이터 업데이트"""
+    try:
+        return run_cohort_pipeline(self, CohortTaskConfig.TRIAL_ACCOUNTS)
+    except Exception as e:
+        raise self.retry(exc=e)
+    
+    
 # ============================================
 # 새 Task 추가 가이드
 # ============================================
