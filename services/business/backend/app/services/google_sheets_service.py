@@ -38,7 +38,8 @@ class GoogleSheetsService:
                     period=record['period'],
                     lead_count=record['lead_count'],
                     trial_conversion=record['trial_conversion'],
-                    subscription_conversion=record['subscription_conversion']
+                    subscription_conversion=record['subscription_conversion'],
+                    end_of_use_count=record['end_of_use_count']
                 )
                 for record in records
             ]
@@ -88,7 +89,8 @@ class GoogleSheetsService:
                     period=record['period'],
                     lead_count=record['lead_count'],
                     trial_conversion=record['trial_conversion'],
-                    subscription_conversion=record['subscription_conversion']
+                    subscription_conversion=record['subscription_conversion'],
+                    end_of_use_count=record['end_of_use_count']
                 )
                 for record in records
             ]
