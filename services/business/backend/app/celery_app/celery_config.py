@@ -134,6 +134,13 @@ celery_app.conf.update(
             "options": {"queue": "cohort"}
         },
         
+        # 활성 고객사 히스토리 데이터 업데이트
+        "update-active-accounts-history-cohort": {
+            "task": "cohort_tasks.update_active_accounts_history_cohort",
+            "schedule": crontab(minute='*/10'),
+            "options": {"queue": "cohort"}
+        },
+        
         
         # MySQL 연결 모니터링 (30분마다)
         "monitor-mysql-health": {

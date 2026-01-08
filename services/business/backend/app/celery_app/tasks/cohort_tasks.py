@@ -308,6 +308,21 @@ def update_lead_applications_cohort(self):
     except Exception as e:
         raise self.retry(exc=e)
     
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    name="cohort_tasks.update_active_accounts_history_cohort",
+    max_retries=3,
+    default_retry_delay=300
+)    
+def update_active_accounts_history_cohort(self):
+    """활성 고객 히스토리 데이터 업데이트"""
+    try:
+        return run_cohort_pipeline(self, CohortTaskConfig.ACTIVE_ACCOUNTS_HISTORY)
+    except Exception as e:
+        raise self.retry(exc=e)
+    
+    
 # ============================================
 # 새 Task 추가 가이드
 # ============================================
