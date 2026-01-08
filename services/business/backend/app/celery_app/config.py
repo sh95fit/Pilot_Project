@@ -116,3 +116,13 @@ class CohortTaskConfig:
         'needs_period': False,
         "start_cell": "A1",
     }
+    
+    ACTIVE_ACCOUNTS_HISTORY = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "활성고객히스토리_DB",
+        'procedure_name': "get_active_accounts_history",
+        'needs_target_date': False,
+        'needs_date_header': False,    
+        'needs_period': True,
+        "start_cell": "A1",
+    }
