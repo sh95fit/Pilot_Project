@@ -240,7 +240,7 @@ def update_now_active_accounts_cohort(self, start_date=None, end_date=None):
         if start_date is None:
             start_date = "2022-12-01"
         if end_date is None:
-            end_date = get_next_business_date()
+            end_date = datetime.now().strftime("%Y-%m-%d")
         
         return run_cohort_pipeline(
             self,
@@ -321,7 +321,7 @@ def update_active_accounts_history_cohort(self):
         if start_date is None:
             start_date = "2022-12-01"
         if end_date is None:
-            end_date = get_next_business_date()
+            end_date = datetime.now().strftime("%Y-%m-%d")
             
         return run_cohort_pipeline(
             self, 
