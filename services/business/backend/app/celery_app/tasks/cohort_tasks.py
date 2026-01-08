@@ -315,7 +315,7 @@ def update_lead_applications_cohort(self):
     max_retries=3,
     default_retry_delay=300
 )    
-def update_active_accounts_history_cohort(self):
+def update_active_accounts_history_cohort(self, start_date=None, end_date=None):
     """활성 고객 히스토리 데이터 업데이트"""
     try:
         if start_date is None:
