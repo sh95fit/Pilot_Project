@@ -318,7 +318,17 @@ def update_lead_applications_cohort(self):
 def update_active_accounts_history_cohort(self):
     """활성 고객 히스토리 데이터 업데이트"""
     try:
-        return run_cohort_pipeline(self, CohortTaskConfig.ACTIVE_ACCOUNTS_HISTORY)
+        if start_date is None:
+            start_date = "2022-12-01"
+        if end_date is None:
+            end_date = get_next_business_date()
+            
+        return run_cohort_pipeline(
+            self, 
+            CohortTaskConfig.ACTIVE_ACCOUNTS_HISTORY,
+            start_date=start_date,
+            end_date=end_date,
+        )
     except Exception as e:
         raise self.retry(exc=e)
     
