@@ -109,7 +109,7 @@ celery_app.conf.update(
         # 상품별 주문 수량 데이터 업데이트        
         "update-product-sales-summary": {
             "task": "cohort_tasks.update_product_sales_summary_cohort",
-            "schedule": crontab(minute='5,20,35,50'),
+            "schedule": crontab(minute='5, 25, 45'),
             "options": {"queue": "cohort"}
         },
         

@@ -29,9 +29,15 @@ class ActiveAccountsRequest(BaseModel):
 
 class ActiveAccountsResponse(BaseModel):
     """활성 계정 응답 (단일 레코드)"""
-    created_date: str = Field(..., description="생성일")
-    daily_active_accounts: int = Field(..., description="일별 활성 계정 수")
+    subscription_date: str = Field(..., description="생성일")
+    daily_new_accounts: int = Field(..., description="일별 활성 계정 수")
     cumulative_active_accounts: int = Field(..., description="누적 활성 계정 수")
+    
+    class Config:
+        # datetime을 자동으로 문자열로 변환
+        json_encoders = {
+            'date': lambda v: v.isoformat() if v else None
+        }
 
 class ActiveAccountsWrapper(BaseModel):
     """활성 계정 응답 래퍼"""
