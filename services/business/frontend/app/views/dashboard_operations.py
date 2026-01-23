@@ -460,8 +460,8 @@ def show_operations_dashboard():
         
         if active_accounts_data:
             df_active = pd.DataFrame(active_accounts_data)
-            df_active["created_date"] = pd.to_datetime(df_active["created_date"])
-            df_active = df_active.sort_values(by="created_date")
+            df_active["subscription_date"] = pd.to_datetime(df_active["subscription_date"])
+            df_active = df_active.sort_values(by="subscription_date")
             
             # 최대값 판별
             max_cumulative = df_active["cumulative_active_accounts"].max()
@@ -472,11 +472,11 @@ def show_operations_dashboard():
                 alt.Chart(df_active)
                 .mark_line(strokeWidth=2)
                 .encode(
-                    x=alt.X("created_date:T", title="날짜", axis=alt.Axis(format="%Y-%m-%d")),
+                    x=alt.X("subscription_date:T", title="날짜", axis=alt.Axis(format="%Y-%m-%d")),
                     y=alt.Y("cumulative_active_accounts:Q", title="누적 활성 계정 수"),
                     tooltip=[
-                        alt.Tooltip("created_date:T", title="날짜", format="%Y-%m-%d"),
-                        alt.Tooltip("daily_active_accounts:Q", title="일일 활성 계정 수"),
+                        alt.Tooltip("subscription_date:T", title="날짜", format="%Y-%m-%d"),
+                        alt.Tooltip("daily_new_accounts:Q", title="일일 활성 계정 수"),
                         alt.Tooltip("cumulative_active_accounts:Q", title="누적 활성 계정 수")
                     ]
                 )
@@ -487,12 +487,12 @@ def show_operations_dashboard():
                 alt.Chart(df_active)
                 .mark_point(size=50, filled=True)
                 .encode(
-                    x=alt.X("created_date:T"),
+                    x=alt.X("subscription_date:T"),
                     y=alt.Y("cumulative_active_accounts:Q"),
                     color=alt.value("#4C78A8"),
                     tooltip=[
-                        alt.Tooltip("created_date:T", title="날짜", format="%Y-%m-%d"),
-                        alt.Tooltip("daily_active_accounts:Q", title="일일 활성 계정 수"),
+                        alt.Tooltip("subscription_date:T", title="날짜", format="%Y-%m-%d"),
+                        alt.Tooltip("daily_new_accounts:Q", title="일일 활성 계정 수"),
                         alt.Tooltip("cumulative_active_accounts:Q", title="누적 활성 계정 수")
                     ]
                 )
@@ -504,12 +504,12 @@ def show_operations_dashboard():
                 alt.Chart(max_point)
                 .mark_point(size=150, filled=True)
                 .encode(
-                    x=alt.X("created_date:T"),
+                    x=alt.X("subscription_date:T"),
                     y=alt.Y("cumulative_active_accounts:Q"),
                     color=alt.value("#FF6B6B"),
                     tooltip=[
-                        alt.Tooltip("created_date:T", title="날짜", format="%Y-%m-%d"),
-                        alt.Tooltip("daily_active_accounts:Q", title="일일 활성 계정 수"),
+                        alt.Tooltip("subscription_date:T", title="날짜", format="%Y-%m-%d"),
+                        alt.Tooltip("daily_new_accounts:Q", title="일일 활성 계정 수"),
                         alt.Tooltip("cumulative_active_accounts:Q", title="누적 활성 계정 수")
                     ]
                 )
@@ -527,7 +527,7 @@ def show_operations_dashboard():
                     color='#FF6B6B'
                 )
                 .encode(
-                    x=alt.X("created_date:T"),
+                    x=alt.X("subscription_date:T"),
                     y=alt.Y("cumulative_active_accounts:Q"),
                     text=alt.Text("cumulative_active_accounts:Q", format=",")
                 )
@@ -540,7 +540,7 @@ def show_operations_dashboard():
             st.altair_chart(line_chart, use_container_width=True)
             
             with st.expander("📋 상세 데이터 보기", expanded=False):
-                display_df_active = df_active[["created_date", "daily_active_accounts", "cumulative_active_accounts"]].copy()
+                display_df_active = df_active[["subscription_date", "daily_new_accounts", "cumulative_active_accounts"]].copy()
                 display_df_active.columns = ["날짜", "일일 활성 계정 수", "누적 활성 계정 수"]
                 display_df_active["날짜"] = display_df_active["날짜"].dt.strftime('%Y-%m-%d')
                 
