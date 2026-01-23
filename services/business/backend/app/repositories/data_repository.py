@@ -57,21 +57,21 @@ class DataRepository(BaseRepository[Dict[str, Any]]):
         normalized_results = []
         for r in rows:
             try:
-                created_date = r.get("created_date") or r.get("CREATED_DATE")
-                daily_active = r.get("daily_active_accounts") or r.get("DAILY_ACTIVE_ACCOUNTS")
+                subscription_date = r.get("subscription_date") or r.get("SUBSCRIPTION_DATE")
+                daily_active = r.get("daily_new_accounts") or r.get("DAILY_NEW_ACCOUNTS")
                 cumulative_active = r.get("cumulative_active_accounts") or r.get("CUMULATIVE_ACTIVE_ACCOUNTS")
 
                 normalized_results.append({
-                    "created_date": str(created_date) if created_date else None,
-                    "daily_active_accounts": int(daily_active) if daily_active is not None else 0,
+                    "subscription_date": str(subscription_date) if subscription_date else None,
+                    "daily_new_accounts": int(daily_active) if daily_active is not None else 0,
                     "cumulative_active_accounts": int(cumulative_active) if cumulative_active is not None else 0
                 })
             except Exception:
                 # 예기치 않은 스키마의 경우 튜플 형태 방어 (만약 DictCursor 미적용 시)
                 if isinstance(r, (list, tuple)) and len(r) >= 3:
                     normalized_results.append({
-                        "created_date": str(r[0]) if r[0] else None,
-                        "daily_active_accounts": int(r[1]) if r[1] is not None else 0,
+                        "subscription_date": str(r[0]) if r[0] else None,
+                        "daily_new_accounts": int(r[1]) if r[1] is not None else 0,
                         "cumulative_active_accounts": int(r[2]) if r[2] is not None else 0
                     })
                 else:

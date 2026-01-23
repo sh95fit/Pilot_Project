@@ -112,8 +112,8 @@ class DataService:
                 count=len(results),
                 data=[
                     ActiveAccountsResponse(
-                        created_date=r["created_date"],
-                        daily_active_accounts=int(r["daily_active_accounts"]),
+                        subscription_date=r["subscription_date"],
+                        daily_new_accounts=int(r["daily_new_accounts"]),
                         cumulative_active_accounts=int(r["cumulative_active_accounts"])
                     )
                     for r in results
