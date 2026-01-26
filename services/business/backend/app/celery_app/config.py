@@ -126,3 +126,13 @@ class CohortTaskConfig:
         'needs_period': True,
         "start_cell": "A1",
     }
+    
+    LATEST_TRIAL_ORDERS = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "체험수량_DB",
+        'procedure_name': "get_latest_trial_orders",
+        'needs_target_date': False,
+        'needs_date_header': False,    
+        'needs_period': False,
+        "start_cell": "A1",
+    }

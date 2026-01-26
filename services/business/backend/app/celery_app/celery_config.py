@@ -141,6 +141,11 @@ celery_app.conf.update(
             "options": {"queue": "cohort"}
         },
         
+        "update-latest-trial-orders-cohort": {
+            "task": "cohort_tasks.update_latest_trial_orders_cohort",
+            "schedule": crontab(minute='8, 18, 28, 38, 48, 58'),
+            "options": {"queue": "cohort"}
+        },       
         
         # MySQL 연결 모니터링 (30분마다)
         "monitor-mysql-health": {
