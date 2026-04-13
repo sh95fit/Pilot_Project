@@ -346,6 +346,47 @@ def update_latest_trial_orders_cohort(self):
     except Exception as e:
         raise self.retry(exc=e)
    
+   
+# JANDI ALERT TASKS
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    name="cohort_tasks.update_jandi_alert_data",
+    max_retries=3,
+    default_retry_delay=300
+)
+def update_jandi_alert_data(self):
+    """잔디 알림용 데이터 일괄 업데이트 (신규유입/체험/구독전환/이탈)"""
+    try:
+        results = []
+
+        for config in CohortTaskConfig.JANDI_ALERT_GROUP:
+            result = run_cohort_pipeline(self, config)
+            results.append({
+                "worksheet": config["worksheet_name"],
+                "status": result.get("status"),
+                "count": result.get("count", 0)
+            })
+            logger.info(
+                f"✅ {config['worksheet_name']}: "
+                f"{result.get('count', 0)}건 업데이트"
+            )
+
+        total = sum(r["count"] for r in results)
+        logger.info(f"✅ 잔디 알림 데이터 일괄 업데이트 완료 (총 {total}건)")
+
+        return {
+            "status": "success",
+            "results": results,
+            "total_count": total,
+            "updated_at": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"❌ 잔디 알림 데이터 업데이트 실패: {e}", exc_info=True)
+        raise self.retry(exc=e)
+   
+   
     
 # ============================================
 # 새 Task 추가 가이드
