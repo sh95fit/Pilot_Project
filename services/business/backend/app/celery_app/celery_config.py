@@ -146,6 +146,13 @@ celery_app.conf.update(
             "schedule": crontab(minute='8, 18, 28, 38, 48, 58'),
             "options": {"queue": "cohort"}
         },       
+
+        # 잔디 알림용 데이터 일괄 업데이트 (매일 08시, 18시)
+        "update-jandi-alert-data": {
+            "task": "cohort_tasks.update_jandi_alert_data",
+            "schedule": crontab(minute=30, hour="8,10,12,14,16,18"),
+            "options": {"queue": "cohort"}
+        },
         
         # MySQL 연결 모니터링 (30분마다)
         "monitor-mysql-health": {

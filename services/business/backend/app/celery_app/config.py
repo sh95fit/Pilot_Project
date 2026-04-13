@@ -136,3 +136,55 @@ class CohortTaskConfig:
         'needs_period': False,
         "start_cell": "A1",
     }
+    
+    # =========================================================
+    # 잔디 알림용 - 4개 프로시저를 하나의 그룹으로 관리
+    # =========================================================
+
+    JANDI_ALERT_NEW_LEADS = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "신규유입",
+        'procedure_name': "sp_get_new_leads",
+        'needs_target_date': False,
+        'needs_date_header': False,
+        'needs_period': False,
+        "start_cell": "A1",
+    }
+
+    JANDI_ALERT_TRIALS = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "체험",
+        'procedure_name': "sp_get_trials",
+        'needs_target_date': False,
+        'needs_date_header': False,
+        'needs_period': False,
+        "start_cell": "A1",
+    }
+
+    JANDI_ALERT_SUBSCRIPTIONS = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "구독전환",
+        'procedure_name': "sp_get_subscriptions",
+        'needs_target_date': False,
+        'needs_date_header': False,
+        'needs_period': False,
+        "start_cell": "A1",
+    }
+
+    JANDI_ALERT_CHURNS = {
+        'spreadsheet_id': settings.google_sheet_id_cohort,
+        'worksheet_name': "이탈",
+        'procedure_name': "sp_get_churns",
+        'needs_target_date': False,
+        'needs_date_header': False,
+        'needs_period': False,
+        "start_cell": "A1",
+    }
+
+    # 그룹으로 묶어서 한번에 참조
+    JANDI_ALERT_GROUP = [
+        JANDI_ALERT_NEW_LEADS,
+        JANDI_ALERT_TRIALS,
+        JANDI_ALERT_SUBSCRIPTIONS,
+        JANDI_ALERT_CHURNS,
+    ]
