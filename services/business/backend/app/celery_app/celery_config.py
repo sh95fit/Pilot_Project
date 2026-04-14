@@ -52,10 +52,13 @@ celery_app.conf.update(
     result_expires=3600,
 
     # Worker 설정
-    worker_prefetch_multiplier=4,
+    worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=1000,  # 메모리 누수 방지
     task_acks_late=True,
     task_reject_on_worker_lost=True,
+    
+    task_time_limit=1680,       # 28분 hard kill
+    task_soft_time_limit=1500,  # 25분 경고
     
     # 재시도 설정
     task_default_retry_delay=60,
@@ -64,96 +67,109 @@ celery_app.conf.update(
     
     # Beat 스케줄러 설정
     beat_schedule={
-        # 미주문 고객사 데이터 업데이트
-        "update-not-ordered-cohort": {
-            "task": "cohort_tasks.update_not_ordered_cohort",
-            "schedule": crontab(hour=14, minute=35, day_of_week="1-5"),
-            "options": {"queue": "cohort"}
-        },
-        
-        # 미주문 고객사 데이터 업데이트
+        # ══════════════════════════════════════════════════════════
+        # 🕐 0~9분 구간 (가벼운 태스크 위주)
+        # ══════════════════════════════════════════════════════════
+
+        # 미주문 고객사 데이터 업데이트 (0, 20, 40분 / 평일 09~14시)
         "update-pending-not-ordered-cohort": {
             "task": "cohort_tasks.update_pending_not_ordered_cohort",
             'schedule': crontab(minute='0,20,40', hour='9-14', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
-    
-        # 서비스 이용 종료 고객사 데이터 업데이트
+
+        # 서비스 이용 종료 고객사 데이터 업데이트 (1, 21, 41분 / 평일 09~20시)
         "update-end-of-use-cohort": {
             "task": "cohort_tasks.update_end_of_use_cohort",
             'schedule': crontab(minute='1,21,41', hour='9-20', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
-        
-        # 활성 고객 데이터 업데이트
+
+        # 고객유입리드 데이터 업데이트 (2, 12, 22, 32, 42, 52분)
+        "update-lead-applications-cohort": {
+            "task": "cohort_tasks.update_lead_applications_cohort",
+            "schedule": crontab(minute='2,12,22,32,42,52'),
+            "options": {"queue": "cohort"}
+        },
+
+        # 활성 고객 데이터 업데이트 (3, 23, 43분 / 평일 09~20시)
         "update-active-customer-cohort": {
             "task": "cohort_tasks.update_active_accounts_cohort",
-            'schedule': crontab(minute='2,22,44', hour='9-20', day_of_week="1-5"),
+            'schedule': crontab(minute='3,23,43', hour='9-20', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
-        
-        # 어드민 유입 고객 데이터 업데이트
-        "update-incoming-leads-cohort": {
-            "task": "cohort_tasks.update_incoming_leads_cohort",
-            "schedule": crontab(minute='3,23,43', hour="9-20", day_of_week="1-5"),
-            "options": {"queue": "cohort"}
-        },
-        
-        # 현재 활성 고객 데이터 업데이트
+
+        # 현재 활성 고객 데이터 업데이트 (4, 24, 44분 / 평일 09~20시)
         "update-now-active-accounts-cohort": {
             "task": "cohort_tasks.update_now_active_accounts_cohort",
             'schedule': crontab(minute='4,24,44', hour='9-20', day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
-        
-        # 상품별 주문 수량 데이터 업데이트        
-        "update-product-sales-summary": {
-            "task": "cohort_tasks.update_product_sales_summary_cohort",
-            "schedule": crontab(minute='5, 25, 45'),
+
+        # 어드민 유입 고객 데이터 업데이트 (7, 27, 47분 / 평일 09~20시)
+        "update-incoming-leads-cohort": {
+            "task": "cohort_tasks.update_incoming_leads_cohort",
+            "schedule": crontab(minute='7,27,47', hour="9-20", day_of_week="1-5"),
             "options": {"queue": "cohort"}
         },
-        
-        # 고객사 단위 상품별 주문 수량 데이터 업데이트        
-        "update-account-orders-summary": {
-            "task": "cohort_tasks.update_account_orders_summary_cohort",
-            "schedule": crontab(minute='6, 26, 46'),
-            "options": {"queue": "cohort"}
-        },
-        
-        # 체험 고객사 데이터 업데이트
-        "update-trial-accounts-cohort": {
-            "task": "cohort_tasks.update_trial_accounts_cohort",
-            "schedule": crontab(minute='7, 27, 47'),
-            "options": {"queue": "cohort"}
-        },
-        
-        # 고객유입리드 데이터 업데이트
-        "update-lead-applications-cohort": {
-            "task": "cohort_tasks.update_lead_applications_cohort",
-            "schedule": crontab(minute='*/10'),
-            "options": {"queue": "cohort"}
-        },
-        
-        # 활성 고객사 히스토리 데이터 업데이트
-        "update-active-accounts-history-cohort": {
-            "task": "cohort_tasks.update_active_accounts_history_cohort",
-            "schedule": crontab(minute='*/10'),
-            "options": {"queue": "cohort"}
-        },
-        
+
+        # 최신 체험 주문 데이터 업데이트 (9, 29, 49분)
         "update-latest-trial-orders-cohort": {
             "task": "cohort_tasks.update_latest_trial_orders_cohort",
-            "schedule": crontab(minute='8, 18, 28, 38, 48, 58'),
+            "schedule": crontab(minute='9,29,49'),
             "options": {"queue": "cohort"}
-        },       
+        },
 
-        # 잔디 알림용 데이터 일괄 업데이트 (매일 08시, 18시)
+        # ══════════════════════════════════════════════════════════
+        # 🕐 10~19분 구간 (무거운 태스크 위주 - 앞 구간 소화 후 실행)
+        # ══════════════════════════════════════════════════════════
+
+        # 활성 고객사 히스토리 데이터 업데이트 (10, 30, 50분) ⚠️ 약 5~6분 소요
+        "update-active-accounts-history-cohort": {
+            "task": "cohort_tasks.update_active_accounts_history_cohort",
+            "schedule": crontab(minute='10,30,50'),
+            "options": {"queue": "cohort"}
+        },
+
+        # 상품별 주문 수량 데이터 업데이트 (13, 33, 53분) ← 기존 5,25,45에서 이동
+        "update-product-sales-summary": {
+            "task": "cohort_tasks.update_product_sales_summary_cohort",
+            "schedule": crontab(minute='13,33,53'),
+            "options": {"queue": "cohort"}
+        },
+
+        # 고객사 단위 상품별 주문 수량 데이터 업데이트 (16, 36, 56분) ← 기존 6,26,46에서 이동
+        "update-account-orders-summary": {
+            "task": "cohort_tasks.update_account_orders_summary_cohort",
+            "schedule": crontab(minute='16,36,56'),
+            "options": {"queue": "cohort"}
+        },
+
+        # 체험 고객사 데이터 업데이트 (18, 38, 58분) ← 기존 9,29,49에서 이동
+        "update-trial-accounts-cohort": {
+            "task": "cohort_tasks.update_trial_accounts_cohort",
+            "schedule": crontab(minute='18,38,58'),
+            "options": {"queue": "cohort"}
+        },
+
+        # ══════════════════════════════════════════════════════════
+        # 🕐 하루 1회 실행
+        # ══════════════════════════════════════════════════════════
+
+        # 미주문 고객사 데이터 업데이트 (평일 14:35 1회)
+        "update-not-ordered-cohort": {
+            "task": "cohort_tasks.update_not_ordered_cohort",
+            "schedule": crontab(hour=14, minute=35, day_of_week="1-5"),
+            "options": {"queue": "cohort"}
+        },
+
+        # 잔디 알림용 데이터 일괄 업데이트 (08~18시 짝수시 30분)
         "update-jandi-alert-data": {
             "task": "cohort_tasks.update_jandi_alert_data",
             "schedule": crontab(minute=30, hour="8,10,12,14,16,18"),
             "options": {"queue": "cohort"}
         },
-        
+
         # MySQL 연결 모니터링 (30분마다)
         "monitor-mysql-health": {
             "task": "cohort_tasks.monitor_mysql_health",
@@ -161,7 +177,7 @@ celery_app.conf.update(
             "options": {"queue": "cohort"}
         },
     },
-    
+
     # 큐 설정
     task_routes={
         "app.celery_app.tasks.cohort_tasks.*": {"queue": "cohort"},
